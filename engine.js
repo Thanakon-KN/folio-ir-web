@@ -19,7 +19,7 @@ const FolioEngine = (() => {
     if (year < 1900 || year > 2199) return null;
     return { id: String(year) + (quarter ? '-Q' + quarter : ''), year, quarter, label: quarter ? 'Q' + quarter + '/' + year : String(year) };
   };
-  const formatPeriodLabel = (period,language='both',buddhist=false) => period.quarter ? (language==='th'?'ไตรมาส ':'Q')+period.quarter+'/'+(period.year+(buddhist?543:0)) : String(period.year+(buddhist?543:0));
+  const formatPeriodLabel = (period,language='en',buddhist=false) => period.quarter ? (language==='th'?'ไตรมาส ':'Q')+period.quarter+'/'+(period.year+(buddhist?543:0)) : String(period.year+(buddhist?543:0));
   const uniquePeriods = list => [...new Map(list.filter(Boolean).map(p => [p.id, p])).values()].sort((a,b)=>a.year-b.year||a.quarter-b.quarter);
   const normalize = value => plainText(value).toLowerCase().normalize('NFKC').replace(/&amp;/g,'&').replace(/[^\p{L}\p{N}]+/gu,'');
   const plainText = value => {
@@ -359,8 +359,7 @@ const FolioEngine = (() => {
     return output;
   }
   function metricLabelCells(row,periodCols){const first=Math.min(...periodCols.map(p=>p.column));return row.cells.filter(cell=>cell.endColumn<=first&&cell.text.trim()).reverse();}
-  function matchesTargetLanguage(text,language='both'){
-    if(language==='both')return true;
+  function matchesTargetLanguage(text,language='en'){
     const value=plainText(text),hasThai=/[\u0E00-\u0E7F]/.test(value),hasLatin=/[A-Za-z]/.test(value);
     if(hasThai&&hasLatin)return true;
     if(!hasThai&&!hasLatin)return true;
@@ -412,7 +411,7 @@ const FolioEngine = (() => {
     return false;
   }
   function scopeKey(code,scope){const before=code.slice(Math.max(0,scope.start-100),scope.start);return before.match(/["']?([\w$]+)["']?\s*:\s*$/)?.[1]||'';}
-  function arrayLiteral(item,template,kind,period,sourceThai,language='both'){
+  function arrayLiteral(item,template,kind,period,sourceThai,language='en'){
     if(kind==='number')return String(item);
     const text=String(template??'');
     if(period.quarter){const buddhist=/(?:25\d{2}|26\d{2})/.test(text)||(!text&&sourceThai);const year=period.year+(buddhist?543:0);return JSON.stringify(formatPeriodLabel({...period,year},language));}
@@ -424,7 +423,7 @@ const FolioEngine = (() => {
     if(!items.length)return '';
     return newline+firstLine+items.join(','+newline+firstLine)+newline;
   }
-  function updateFinancialJs(code,summary,selected,mode,report,language='both'){
+  function updateFinancialJs(code,summary,selected,mode,report,language='en'){
     const scopes=scanObjectScopes(code),patches=[],handled=new Set(),qoqPatches=new Set();let changed=0;
     const sourceThai=/[\u0E00-\u0E7F]/.test(code);
     for(const scope of scopes){
@@ -478,12 +477,12 @@ const FolioEngine = (() => {
     let output=code;for(const patch of patches.sort((a,b)=>b.start-a.start))output=output.slice(0,patch.start)+patch.text+output.slice(patch.end);
     return output;
   }
-  const updateFinancial=(payload,summary,selection,mode,language='both')=>{
+  const updateFinancial=(payload,summary,selection,mode,language='en')=>{
     const periods=validateSelection(selection,summary);if(!['add','replace'].includes(mode))throw new Error('เลือกวิธีเพิ่มหรือแทนที่ข้อมูล');
     const report={changes:[],unmatched:[],notes:[]};
     const html=payload.html?updateFinancialHtml(payload.html,summary,periods,mode,language,report):'';
     const javascript=payload.javascript?updateFinancialJs(payload.javascript,summary,periods,mode,report,language):'';
-    report.notes.push('ภาษา HTML ที่เลือก: '+({both:'ทั้งสองภาษา',en:'English',th:'ภาษาไทย'}[language]||'ทั้งสองภาษา'));
+    report.notes.push('ภาษา HTML ที่เลือก: '+({en:'English',th:'ภาษาไทย'}[language]||'English'));
     if(mode==='add'&&!summary.sourcePeriods.some(p=>!summary.existingPeriods.some(o=>o.id===p.id)))report.notes.push('ไม่พบงวดใหม่ในไฟล์; โหมดเพิ่มจึงคงค่าของงวดซ้ำไว้');
     return {html,javascript,...report};
   };

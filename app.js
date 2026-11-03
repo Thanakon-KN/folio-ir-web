@@ -9,7 +9,7 @@
   const key=()=>`folio-ir-web-${activeWorkflow}`;
   const hasCode=()=>Boolean($('#html-code').value.trim()||$('#javascript-code').value.trim());
   const mode=()=>isShareholder()?'shareholder':$('input[name="update-mode"]:checked')?.value||'';
-  const targetLanguage=()=>$('input[name="target-language"]:checked')?.value||'both';
+  const targetLanguage=()=>$('input[name="target-language"]:checked')?.value||'en';
   const selected=()=>$$('input[name="display-period"]:checked').map(input=>input.value);
   const msg=(text,kind='')=>{ui.notice=text;$('#status').textContent=text;$('#status').dataset.kind=kind;renderGuide();};
   function fileProblem(){if(ui.files.length>maxFiles)return`เลือกได้ไม่เกิน ${maxFiles} ไฟล์`;const size=ui.files.reduce((n,f)=>n+f.size,0);if(size>maxBytes)return`ขนาดไฟล์รวมเกิน ${maxBytes/1024/1024} MB`;const allowed=['xlsx','xls','xlsm','csv','tsv'];const bad=ui.files.find(f=>!allowed.includes(f.name.split('.').pop().toLowerCase()));return bad?`ไม่รองรับไฟล์ ${bad.name}`:'';}
