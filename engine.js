@@ -276,7 +276,7 @@ const FolioEngine = (() => {
         const row=tableRows[ri];if(ri===headIndex)continue;
         const labelCell=metricLabelCell(row,periodCols);if(!labelCell)continue;
         const metric=findMetric(summary.metrics,labelCell.text,'detail',selected);
-        if(!metric)continue;
+        if(!metric){const containsNumber=periodCols.some(period=>numberFrom(row.cells[period.i]?.text)!==null);if(containsNumber)report.unmatched.push(`HTML “${labelCell.text}” มีค่าตัวเลขแต่จับคู่กับแถว workbook ไม่ได้ · คงแถวเดิมไว้`);continue;}
         matched=true;
         const startCol=Math.min(...periodCols.map(p=>p.i));const baseCells=row.cells.filter((_,i)=>i<startCol).map(c=>c.raw);const valueCells=[];
         for(const id of wanted){const oldIndex=known.get(id),old=oldIndex===undefined?null:row.cells[oldIndex];const source=metric.values[id];let value;
