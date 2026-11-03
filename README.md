@@ -11,7 +11,7 @@ Open `index.html` in a modern browser. To publish with GitHub Pages, place the c
 ### Financial Highlights
 
 - Reads XLSX, XLS, XLSM, CSV, and TSV files locally in the browser.
-- Detects period headers and numeric rows arranged with periods in columns.
+- Detects period columns arranged horizontally, including quarter labels whose fiscal year is in the preceding header row; reads numeric cached display values when raw formula values are blank.
 - Inspects periods found in the workbook and in the existing HTML / JavaScript.
 - Requires an explicit period selection and Add or Replace choice.
 - Matches table rows and chart series by normalized labels, common aliases, and token similarity; prefers detailed financial rows for tables and summary rows for charts.
@@ -23,7 +23,7 @@ Open `index.html` in a modern browser. To publish with GitHub Pages, place the c
 ### Major Shareholders
 
 - Scans workbook sheets for Overview, Free float, Graph, and shareholder list sections.
-- Updates Overview / Free float values when a recognized workbook label is followed by its value in the same row and the HTML has a matching label/value pair.
+- Updates Overview / Free float fields in common nested label/value cards and tables, including numeric component attributes.
 - Updates matching shareholder rows, adds source-listed holders missing from a recognizable HTML table, and updates supported `majorShareholders` / `shareholders` chart arrays from an explicit Graph sheet.
 - Reports graph percentage totals that differ from 100% without normalizing the source data.
 

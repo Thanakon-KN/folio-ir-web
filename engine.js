@@ -72,16 +72,29 @@ const FolioEngine = (() => {
     for(const book of workbook.books) for(const sheet of book.sheets){
       const all=sheet.rows;
       for(let ri=0;ri<all.length;ri++){
-        const row=all[ri], candidates=row.cells.map(cell=>({cell,period:periodFrom(cell.text)})).filter(x=>x.period);
-        if(!candidates.length) continue;
-        const explicitSinglePeriod=candidates.length===1&&row.cells.length<=2&&row.cells.some(cell=>/^(?:year|period|ปี|งวด|FY)$/i.test(cell.text.trim()));
-        if(candidates.length<2&&!candidates.some(x=>x.period.quarter)&&!explicitSinglePeriod)continue;
+        const row=all[ri];
+        const quarterOnly=row.cells.map(cell=>({cell,match:cell.text.match(/^(?:Q\s*([1-4])|([1-4])\s*Q|Quarter\s*([1-4])|ไตรมาส\s*([1-4]))$/i)})).filter(x=>x.match);
+        const direct=row.cells.map(cell=>({cell,period:periodFrom(cell.text)})).filter(x=>x.period);
+        const hasNumericBelow=col=>{for(let i=ri+1;i<Math.min(all.length,ri+9);i++){if(all[i].row>all[i-1].row+2)break;const cell=all[i].cells.find(item=>item.col===col);if(cell&&(numberFrom(cell.raw)!==null||numberFrom(cell.text)!==null))return true;}return false;};
+        const periodsByCol=[];
+        if(quarterOnly.length){
+          for(const item of quarterOnly){
+            let yearCell=direct.filter(x=>!x.period.quarter&&x.cell.col<=item.cell.col).sort((a,b)=>b.cell.col-a.cell.col)[0];
+            if(!yearCell){for(let previous=ri-1;previous>=Math.max(0,ri-3)&&!yearCell;previous--){const yearHeaders=all[previous].cells.map(cell=>({cell,period:periodFrom(cell.text)})).filter(x=>x.period&&!x.period.quarter&&x.cell.col<=item.cell.col);yearCell=yearHeaders.sort((a,b)=>b.cell.col-a.cell.col)[0];}}
+            if(!yearCell)continue;const q=Number(item.match[1]||item.match[2]||item.match[3]||item.match[4]);const period=periodFrom(`${q}Q/${yearCell.period.year}`);if(period&&hasNumericBelow(item.cell.col))periodsByCol.push({period,col:item.cell.col});
+          }
+        }
+        for(const item of direct){const groupingHeader=quarterOnly.some(q=>q.cell.col===item.cell.col);if((!quarterOnly.length||!groupingHeader)&&hasNumericBelow(item.cell.col))periodsByCol.push({period:item.period,col:item.cell.col});}
+        const candidates=[...new Map(periodsByCol.map(x=>[x.col+'|'+x.period.id,x])).values()];
+        if(!candidates.length)continue;
+        const uniqueHeaderPeriods=uniquePeriods(candidates.map(x=>x.period));
+        if(uniqueHeaderPeriods.length<2&&!candidates.some(x=>x.period.quarter)&&!(row.cells.length<=2&&row.cells.some(cell=>/^(?:year|period|ปี|งวด|FY)$/i.test(cell.text.trim()))))continue;
         sourcePeriods.push(...candidates.map(x=>x.period));
-        const firstPeriodCol=Math.min(...candidates.map(x=>x.cell.col));
+        const firstPeriodCol=Math.min(...candidates.map(x=>x.col));
         const sectionContext=all.slice(Math.max(0,ri-4),ri).map(item=>item.cells.map(cell=>cell.text).join(' ')).join(' ');
         const sheetLabel=(book.name+' / '+sheet.name).toLowerCase();
         const kind=/graph|chart|summary|home|overview|highlights summary|สรุป|กราฟ/i.test(sheetLabel+' '+sectionContext)?'summary':'detail';
-        const periods=candidates.map(x=>({period:x.period,col:x.cell.col}));
+        const periods=candidates.map(x=>({period:x.period,col:x.col}));
         for(let rj=ri+1;rj<all.length;rj++){
           const data=all[rj];
           if(data.row>all[rj-1].row+2) break;
@@ -92,7 +105,7 @@ const FolioEngine = (() => {
           const values={}; let found=false;
           for(const item of periods){
             const cell=data.cells.find(x=>x.col===item.col);
-            const val=numberFrom(cell?.raw ?? cell?.text);
+            let val=numberFrom(cell?.raw);if(val===null)val=numberFrom(cell?.text);
             if(val!==null){values[item.period.id]={value:val,text:cell?.text||String(val),address:cell?.address||''};found=true;}
           }
           if(found && normalize(label)) {
@@ -172,7 +185,7 @@ const FolioEngine = (() => {
         const pctCol=labels.findIndex(x=>/^(percent|percentage|shareholdingpercent|ownership|สัดส่วน|ร้อยละ|%)$/.test(x)||/(?:percent|percentage)$/.test(x));
         const graphSheet=/graph|chart|กราฟ/i.test(sheet.name);
         if(nameCol<0||(shareCol<0&&!(graphSheet&&pctCol>=0)))continue;
-        for(const row of sheet.rows.slice(i+1)){const name=row.cells.find(c=>c.col===header.cells[nameCol].col)?.text||'';const share=shareCol>=0?row.cells.find(c=>c.col===header.cells[shareCol].col):null;const pct=pctCol>=0?row.cells.find(c=>c.col===header.cells[pctCol].col):null;const shares=share?numberFrom(share.raw??share.text):null;const percent=pct?numberFrom(pct.raw??pct.text):null;if(name&&(shares!==null||percent!==null))rows.push({name,shares,percent,sheet:sheet.name,source:`${book.name} / ${sheet.name} / row ${row.row}`});}
+        for(const row of sheet.rows.slice(i+1)){const name=row.cells.find(c=>c.col===header.cells[nameCol].col)?.text||'';const share=shareCol>=0?row.cells.find(c=>c.col===header.cells[shareCol].col):null;const pct=pctCol>=0?row.cells.find(c=>c.col===header.cells[pctCol].col):null;const shareRaw=numberFrom(share?.raw),percentRaw=numberFrom(pct?.raw);const shares=shareRaw!==null?shareRaw:numberFrom(share?.text),percent=percentRaw!==null?percentRaw:numberFrom(pct?.text);if(name&&(shares!==null||percent!==null))rows.push({name,shares,percent,sheet:sheet.name,source:`${book.name} / ${sheet.name} / row ${row.row}`});}
       }
     }
     return rows;
@@ -225,8 +238,8 @@ const FolioEngine = (() => {
   const replaceCellText=(raw,oldText,newText)=>{
     let next=raw;
     // Vue numeric components commonly store a value in :number or number attributes.
-    if(/(?:\:number|\bnumber)\s*=\s*(["'])/.test(next)){
-      const re=/(\:?number\s*=\s*)(["'])([\s\S]*?)\2/i;return next.replace(re,(_,prefix,q,value)=>prefix+q+value.replace(/-?\d[\d,.]*/,newText)+q);
+    if(/(?:\:?(?:number|value|count|percent|percentage)|\bnumber)\s*=\s*(["'])/i.test(next)){
+      const re=/((?:\:?(?:number|value|count|percent|percentage)|\bnumber)\s*=\s*)(["'])([\s\S]*?)\2/i;return next.replace(re,(_,prefix,q,value)=>prefix+q+(/-?\d[\d,.]*/.test(value)?value.replace(/-?\d[\d,.]*/,newText):newText)+q);
     }
     const content=next.match(/^(<[^>]+>)([\s\S]*)(<\/[^>]+>)$/);if(!content)return raw;
     const inner=content[2];
@@ -446,7 +459,7 @@ const FolioEngine = (() => {
       freeFloatPercent:{labels:['Free Float','Free Float %','Free Float Percentage','สัดส่วนผู้ถือหุ้นรายย่อย','ร้อยละผู้ถือหุ้นรายย่อย'],format:'percent'}
     };
     for(const [id,fact] of Object.entries(summary.shareholderFacts||{})){
-      const rule=factRules[id];if(!rule)continue;const numeric=numberFrom(fact.raw??fact.value);const percentFact=rule.format==='percent'||(id==='scripless'&&/%/.test(fact.value));const replacement=rule.format==='number'&&numeric!==null?numeric.toLocaleString('en-US'):percentFact&&numeric!==null?numeric.toFixed(2)+'%':fact.value;
+      const rule=factRules[id];if(!rule)continue;const rawNumber=numberFrom(fact.raw),numeric=rawNumber!==null?rawNumber:numberFrom(fact.value);const percentFact=rule.format==='percent'||(id==='scripless'&&/%/.test(fact.value));const replacement=rule.format==='number'&&numeric!==null?numeric.toLocaleString('en-US'):percentFact&&numeric!==null?numeric.toFixed(2)+'%':fact.value;
       const result=replaceSiblingValue(html,rule.labels,replacement);
       if(result.count===1){html=result.html;report.changes.push({item:id,oldValue:'HTML value',newValue:replacement,source:fact.source});}
       else report.unmatched.push(result.count?'พบ label “'+rule.labels[0]+'” หลายจุด จึงไม่แทนที่':'พบ '+id+' ใน workbook แต่ไม่พบ label/value ที่รองรับใน HTML');
@@ -491,13 +504,26 @@ const FolioEngine = (() => {
     return {html,javascript,...report};
   };
   function replaceSiblingValue(html,labels,value){
-    let count=0,output=html;const tag='(?:div|span|td|th|dd|dt|p|li)';
-    const re=new RegExp(`(<(${tag})\\b[^>]*>)([\\s\\S]*?)(<\\/\\2>)(\\s*)(<(${tag})\\b[^>]*>)([\\s\\S]*?)(<\\/\\7>)`,'gi');
-    output=output.replace(re,(whole,open,labelTag,labelInner,labelClose,space,valueOpen,valueTag,valueInner,valueClose)=>{
-      const actual=normalize(labelInner);if(!labels.some(x=>normalize(x)===actual))return whole;
-      count++;if(count>1)return whole;const full=valueOpen+valueInner+valueClose;const next=replaceCellText(full,plainText(valueInner),value);return open+labelInner+labelClose+space+next;
-    });
-    return {html:output,count};
+    const nodes=[],stack=[],token=/<\!--[\s\S]*?-->|<\/?[A-Za-z][\w:-]*\b[^>]*>/g,voidTags=new Set(['area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr']);let match;
+    while((match=token.exec(html))){const raw=match[0];if(raw.startsWith('<!--'))continue;const closing=/^<\//.test(raw),tag=raw.match(/^<\/?([\w:-]+)/)?.[1]?.toLowerCase();if(!tag)continue;
+      if(closing){let index=stack.length-1;while(index>=0&&stack[index].tag!==tag)index--;if(index>=0){for(let i=stack.length-1;i>=index;i--){stack[i].closeStart=match.index;stack[i].end=token.lastIndex;}stack.length=index;}continue;}
+      const node={tag,start:match.index,contentStart:token.lastIndex,closeStart:token.lastIndex,end:token.lastIndex,parent:stack.at(-1)||null,children:[],rawOpen:raw};if(node.parent)node.parent.children.push(node);nodes.push(node);
+      if(!voidTags.has(tag)&&! /\/\s*>$/.test(raw))stack.push(node);
+      if(tag==='script'||tag==='style'){const close=html.toLowerCase().indexOf('</'+tag,token.lastIndex);if(close>=0)token.lastIndex=close;}
+    }
+    for(const node of stack){node.closeStart=html.length;node.end=html.length;}
+    const inner=node=>html.slice(node.contentStart,node.closeStart);
+    const hasValue=node=>/:(?:number|value|count|percent|percentage)\s*=|\b(?:number|value|count|percent|percentage)\s*=/i.test(node.rawOpen+inner(node))||Boolean(plainText(inner(node)));
+    const matched=[];
+    for(const labelNode of nodes){if(!['div','span','td','th','dd','dt','p','li','label','strong','small'].includes(labelNode.tag)&&!/^h[1-6]$/.test(labelNode.tag))continue;
+      const label=plainText(inner(labelNode));if(!labels.some(item=>normalize(item)===normalize(label)))continue;
+      let probe=labelNode,parent=labelNode.parent,target=null,levels=0;
+      while(parent&&levels++<4&&!target){const at=parent.children.indexOf(probe);if(at>=0)target=parent.children.slice(at+1).find(hasValue)||null;if(!target){probe=parent;parent=parent.parent;}}
+      if(target)matched.push({target,label});
+    }
+    const unique=[...new Map(matched.map(item=>[item.target.start,item])).values()];if(unique.length!==1)return {html,count:unique.length};
+    const {target}=unique[0],raw=html.slice(target.start,target.end),old=plainText(inner(target)),replacement=replaceCellText(raw,old,value);
+    return {html:html.slice(0,target.start)+replacement+html.slice(target.end),count:1};
   }
   return {parseWorkbook,inspect,periodFrom,extractExistingPeriods,extractFinancial,updateFinancial,updateShareholders,plainText,numberFrom,uniquePeriods};
 })();
