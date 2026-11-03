@@ -40,17 +40,6 @@ const FolioEngine = (() => {
     const negative=/^\(.*\)$/.test(text); text=text.replace(/[(),%\s]/g,'').replace(/,/g,'');
     const n=Number(text); return Number.isFinite(n)?(negative?-Math.abs(n):n):null;
   };
-  const formatLike = (oldValue, value) => {
-    if (value === null || value === undefined) return String(oldValue ?? '');
-    const old=String(oldValue??'').trim();
-    if (/\(/.test(old)&&/\)/.test(old)&&value<0) return '('+Math.abs(value).toLocaleString('en-US',{minimumFractionDigits:decimalPlaces(old),maximumFractionDigits:decimalPlaces(old)})+')';
-    const decimals=decimalPlaces(old), grouped=/\d,\d{3}/.test(old), pct=/%/.test(old);
-    let result=Math.abs(value).toLocaleString('en-US',{useGrouping:grouped,minimumFractionDigits:decimals,maximumFractionDigits:decimals});
-    if(!decimals && !old.includes('.')) result=String(Math.round(value));
-    if(value<0) result='-'+result;
-    return result+(pct?'%':'');
-  };
-  const decimalPlaces = value => { const match=String(value??'').replace(/,/g,'').match(/\.(\d+)/); return match?match[1].length:0; };
   const parseWorkbook = async files => {
     if (!window.XLSX) throw new Error('โหลดตัวอ่าน Excel ไม่สำเร็จ');
     if (!files.length) throw new Error('เลือกไฟล์ข้อมูลต้นทางก่อน');
@@ -220,7 +209,7 @@ const FolioEngine = (() => {
         const pctCol=labels.findIndex(x=>/^(percent|percentage|shareholdingpercent|ownership|สัดส่วน|ร้อยละ|%)$/.test(x)||/(?:percent|percentage)$/.test(x));
         const graphSheet=/graph|chart|กราฟ/i.test(sheet.name);
         if(nameCol<0||(shareCol<0&&!(graphSheet&&pctCol>=0)))continue;
-        for(const row of sheet.rows.slice(i+1)){const name=row.cells.find(c=>c.col===header.cells[nameCol].col)?.text||'';const share=shareCol>=0?row.cells.find(c=>c.col===header.cells[shareCol].col):null;const pct=pctCol>=0?row.cells.find(c=>c.col===header.cells[pctCol].col):null;const shareRaw=numberFrom(share?.raw),percentRaw=numberFrom(pct?.raw);const shares=shareRaw!==null?shareRaw:numberFrom(share?.text),percent=percentRaw!==null?percentRaw:numberFrom(pct?.text);if(name&&(shares!==null||percent!==null))rows.push({name,shares,percent,sheet:sheet.name,source:`${book.name} / ${sheet.name} / row ${row.row}`});}
+        for(const row of sheet.rows.slice(i+1)){const name=row.cells.find(c=>c.col===header.cells[nameCol].col)?.text||'';const share=shareCol>=0?row.cells.find(c=>c.col===header.cells[shareCol].col):null;const pct=pctCol>=0?row.cells.find(c=>c.col===header.cells[pctCol].col):null;const shareRaw=numberFrom(share?.raw),percentRaw=numberFrom(pct?.raw);const shares=shareRaw!==null?shareRaw:numberFrom(share?.text),percent=percentRaw!==null?percentRaw:numberFrom(pct?.text);if(name&&(shares!==null||percent!==null))rows.push({name,shares,percent,sharesText:share?.text??String(shares??''),percentText:pct?.text??String(percent??''),sheet:sheet.name,source:`${book.name} / ${sheet.name} / row ${row.row}`});}
       }
     }
     return rows;
@@ -307,17 +296,6 @@ const FolioEngine = (() => {
     }
     return content[1]+newText+content[3];
   };
-  function formatFinancialValue(previous,value,label){
-    const prior=String(previous??'').trim();
-    const precise=/(?:eps|per share|margin|ratio|percent|percentage|yield|roe|roa|งบต่อหุ้น|กำไรต่อหุ้น|อัตราส่วน|ร้อยละ|เปอร์เซ็นต์)/i.test(label);
-    const decimals=decimalPlaces(prior);
-    if(decimals>0)return formatLike(prior,value);
-    const places=precise?2:0;
-    const grouped=/\d,\d{3}/.test(prior);
-    const sign=value<0?'-':'';
-    const result=Math.abs(value).toLocaleString('en-US',{useGrouping:grouped,minimumFractionDigits:places,maximumFractionDigits:places});
-    return sign+result+(/%/.test(prior)?'%':'');
-  }
   function emptyFinancialValue(source,previous){
     const sourceText=String(source?.text??'').trim();if(/^[-–—]$/.test(sourceText))return sourceText;
     const original=String(previous??''),prior=plainText(original).trim();
@@ -326,14 +304,18 @@ const FolioEngine = (() => {
   }
   function financialValueCell(oldCell,templateCell,source,label){
     const cell=oldCell||templateCell;if(!cell)return '<td></td>';
-    const previous=oldCell?.text??templateCell?.text??'';
-    const value=source?(source.value===null?emptyFinancialValue(source,previous):formatFinancialValue(previous,source.value,label)):oldCell?oldCell.text:emptyFinancialValue({text:''},previous);
+    const previous=oldCell?.text??'';
+    const value=source?(source.value===null?emptyFinancialValue(source,previous):String(source.text??source.value)):missingFinancialValue(previous);
     return replaceCellText(cell.raw,cell.text,value);
   }
-  function emptyArrayValue(source,previous,fallback){
+  function missingFinancialValue(previous){const prior=plainText(previous).trim();return /^[-–—]$/.test(prior)?prior:'';}
+  function emptyArrayValue(source,previous){
     const sourceText=String(source?.text??'').trim();if(/^[-–—]$/.test(sourceText))return JSON.stringify(sourceText);
-    const preserve=value=>{if(value===null)return 'null';if(value===undefined)return null;if(typeof value==='number')return value===0?'0':null;const text=String(value).trim();if(!text)return '""';if(/^[-–—]$/.test(text)||numberFrom(text)===0)return JSON.stringify(value);return null;};
-    return preserve(previous)??preserve(fallback)??'null';
+    if(previous===null||previous===undefined)return 'null';
+    if(typeof previous==='number')return previous===0?'0':'null';
+    const text=String(previous).trim();if(!text)return '""';
+    if(/^[-–—]$/.test(text)||numberFrom(text)===0)return JSON.stringify(previous);
+    return 'null';
   }
   function replaceRowCells(row,newCells){
     let raw=row.raw;for(let i=row.cells.length-1;i>=0;i--){const c=row.cells[i];raw=raw.slice(0,c.start)+raw.slice(c.end);}const close=raw.lastIndexOf('</tr>');return close<0?row.raw:raw.slice(0,close)+newCells.join('')+raw.slice(close);
@@ -412,12 +394,12 @@ const FolioEngine = (() => {
       const context=headings.map(x=>plainText(x[1])).filter(Boolean).slice(-2).join(' ');
       if(!matchesTargetLanguage(context,language))continue;
       let metric=findMetric(summary.metrics,context,'summary',selected)||findMetric(summary.metrics,context,'detail',selected);
-      if(!metric||!latest||!metric.values[latest.id])continue;
+      if(!metric||!latest)continue;
       const source=metric.values[latest.id],old=tag[0].match(/(?:\:number|\bnumber)\s*=\s*(["'])(.*?)\1/i);
-      if(!old)continue;const value=source.value===null?emptyFinancialValue(source,old[2]):formatFinancialValue(old[2],source.value,metric.label);
+      if(!old)continue;const value=source?(source.value===null?emptyFinancialValue(source,old[2]):String(source.text??source.value)):'';
       const replacement=tag[0].replace(old[0],old[0].replace(old[2],value));
       output=output.slice(0,start)+replacement+output.slice(start+tag[0].length);changed++;
-      report.changes.push({item:context||metric.label,oldValue:old[2],newValue:value,source:source.address?metric.sheet+' row '+metric.row+' · '+source.address:metric.sheet+' row '+metric.row});
+      report.changes.push({item:context||metric.label,oldValue:old[2],newValue:value,source:source?.address?metric.sheet+' row '+metric.row+' · '+source.address:metric.sheet+' row '+metric.row});
     }
     if(changed)report.notes.push('อัปเดตตัวเลข counter-number จากงวดล่าสุดที่เลือก ('+latest.label+')');
     return output;
@@ -511,7 +493,7 @@ const FolioEngine = (() => {
   }
   function financialArrayNumber(value,previous){
     const prior=String(previous??'').trim();if(numberFrom(prior)===value)return prior;
-    const decimals=decimalPlaces(prior);return decimals?Number(value).toFixed(decimals):String(Number(value.toPrecision?.(12)??value));
+    return String(value);
   }
   function updateFinancialJs(code,summary,selected,mode,report,language='en'){
     const scopes=scanObjectScopes(code),patches=[],handled=new Set(),qoqPatches=new Set();let changed=0;
@@ -545,8 +527,8 @@ const FolioEngine = (() => {
           const aligned=[];
           for(const period of targetPeriods){
             const at=oldIndex.get(period.id),source=metric.values[period.id];
-            if(source){aligned.push(source.value===null?emptyArrayValue(source,values[at],values[0]):financialArrayNumber(source.value,values[at]));}
-            else if(at!==undefined){aligned.push(values[at]??'null');report.unmatched.push(`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook · คงค่าเดิมใน JavaScript ไว้`);}
+            if(source){aligned.push(source.value===null?emptyArrayValue(source,values[at]):financialArrayNumber(source.value,values[at]));}
+            else if(at!==undefined){aligned.push('null');report.unmatched.push(`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook · ล้างค่าเดิมที่ไม่มีแหล่งข้อมูล`);}
             else{aligned.push('null');report.unmatched.push(`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook และกราฟเดิม`);}
           }
           updates.set(series.name,{series,metric,values:aligned});
@@ -587,10 +569,8 @@ const FolioEngine = (() => {
       changed++;
       for(const period of targetPeriods){
         const at=oldIndex.get(period.id),source=sourceFor(metric,scopeComparisonMetric,period,comparisonKind);
-        const keepOld=at!==undefined&&!source;
-        if(keepOld){nextIds.push(period.id);nextPeriods.push(oldPeriodRaw[at]||arrayLiteral(oldPeriodTokens[at],oldPeriodRaw[0]||shortPeriodTemplate, 'period',period,sourceThai,language));nextData.push(oldDataRaw[at]??'null');report.unmatched.push(`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook · คงค่าเดิมใน JavaScript ไว้`);}
-        else if(source){nextIds.push(period.id);nextPeriods.push(at!==undefined?oldPeriodRaw[at]:arrayLiteral(period.id,oldPeriodRaw[0]||shortPeriodTemplate,'period',period,sourceThai,language));nextData.push(source.value===null?emptyArrayValue(source,oldDataRaw[at],oldDataRaw[0]):financialArrayNumber(source.value,oldDataRaw[at]));}
-        else if(at!==undefined){nextIds.push(period.id);nextPeriods.push(oldPeriodRaw[at]||arrayLiteral(oldPeriodTokens[at],oldPeriodRaw[0]||shortPeriodTemplate,'period',period,sourceThai,language));nextData.push(oldDataRaw[at]??'null');report.unmatched.push(`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook · คงค่าเดิมไว้`);}
+        if(source){nextIds.push(period.id);nextPeriods.push(at!==undefined?oldPeriodRaw[at]:arrayLiteral(period.id,oldPeriodRaw[0]||shortPeriodTemplate,'period',period,sourceThai,language));nextData.push(source.value===null?emptyArrayValue(source,oldDataRaw[at]):financialArrayNumber(source.value,oldDataRaw[at]));}
+        else if(at!==undefined){nextIds.push(period.id);nextPeriods.push(oldPeriodRaw[at]||arrayLiteral(oldPeriodTokens[at],oldPeriodRaw[0]||shortPeriodTemplate, 'period',period,sourceThai,language));nextData.push('null');report.unmatched.push(`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook · ล้างค่าเดิมที่ไม่มีแหล่งข้อมูล`);}
         else report.unmatched.push(`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook และกราฟเดิม`);
       }
       const signature=scope.start+':'+dataArray.open;if(handled.has(signature))continue;handled.add(signature);
@@ -602,8 +582,8 @@ const FolioEngine = (() => {
         const aligned=[];for(const period of targetPeriods){
           if(!nextIds.includes(period.id))continue;
           const at=oldIndex.get(period.id),source=sourceFor(seriesMetric,comparisonMetric,period,type);
-          if(at!==undefined&&!source)aligned.push(rawValues[at]??'null');
-          else if(source)aligned.push(source.value===null?emptyArrayValue(source,rawValues[at],rawValues[0]):financialArrayNumber(source.value,rawValues[at]));
+          if(source)aligned.push(source.value===null?emptyArrayValue(source,rawValues[at]):financialArrayNumber(source.value,rawValues[at]));
+          else if(at!==undefined){aligned.push('null');report.unmatched.push(`${seriesMetric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook · ล้างค่าเดิมที่ไม่มีแหล่งข้อมูล`);}
           else aligned.push(at===undefined?'null':rawValues[at]??'null');
         }
         const updated=updateArrayItems(aligned,series.inner);
@@ -643,7 +623,7 @@ const FolioEngine = (() => {
       freeFloatPercent:{labels:['Free Float','Free Float %','Free Float Percentage','สัดส่วนผู้ถือหุ้นรายย่อย','ร้อยละผู้ถือหุ้นรายย่อย'],format:'percent'}
     };
     for(const [id,fact] of Object.entries(summary.shareholderFacts||{})){
-      const rule=factRules[id];if(!rule)continue;const rawNumber=numberFrom(fact.raw),numeric=rawNumber!==null?rawNumber:numberFrom(fact.value);const percentFact=rule.format==='percent'||(id==='scripless'&&/%/.test(fact.value));const replacement=rule.format==='number'&&numeric!==null?numeric.toLocaleString('en-US'):percentFact&&numeric!==null?numeric.toFixed(2)+'%':fact.value;
+      const rule=factRules[id];if(!rule)continue;const replacement=fact.value;
       const result=replaceSiblingValue(html,rule.labels,replacement);
       if(result.count===1){html=result.html;report.changes.push({item:id,oldValue:'HTML value',newValue:replacement,source:fact.source});}
       else report.unmatched.push(result.count?'พบ label “'+rule.labels[0]+'” หลายจุด จึงไม่แทนที่':'พบ '+id+' ใน workbook แต่ไม่พบ label/value ที่รองรับใน HTML');
@@ -652,8 +632,8 @@ const FolioEngine = (() => {
     html=html.replace(/<table\b[\s\S]*?<\/table>/gi,table=>{
       const trs=scanRows(table);if(!trs.length)return table;const header=trs.find(r=>/shareholder|ผู้ถือหุ้น/i.test(r.cells.map(c=>c.text).join(' ')));if(!header)return table;
       const h=header.cells.map(c=>normalize(c.text));const nameCol=h.findIndex(x=>/shareholder|name|ผู้ถือหุ้น|ชื่อ/.test(x));const sharesCol=h.findIndex(x=>/shares|จำนวนหุ้น|หุ้น/.test(x));const pctCol=h.findIndex(x=>/percent|percentage|ร้อยละ|สัดส่วน/.test(x));if(nameCol<0||sharesCol<0)return table;
-      let changedTable=table;const dataRows=trs.slice(trs.indexOf(header)+1);for(const row of dataRows.slice().reverse()){const label=normalize(row.cells[nameCol]?.text);const item=names.get(label);if(!item)continue;let raw=row.raw;const replacements=[];if(row.cells[sharesCol]&&item.shares!==null)replacements.push([row.cells[sharesCol],formatLike(row.cells[sharesCol].text,item.shares)]);if(pctCol>=0&&row.cells[pctCol]&&item.percent!==null)replacements.push([row.cells[pctCol],formatLike(row.cells[pctCol].text,item.percent)]);for(const [cell,value] of replacements.reverse())raw=raw.slice(0,cell.start)+replaceCellText(cell.raw,cell.text,value)+raw.slice(cell.end);changedTable=changedTable.slice(0,row.start)+raw+changedTable.slice(row.end);found++;report.changes.push({item:item.name,oldValue:'ค่าจากโค้ดเดิม',newValue:`${item.shares===null?'':item.shares.toLocaleString('en-US')+' หุ้น'}${item.percent===null?'':` · ${item.percent.toFixed(2)}%`}`,source:item.source});}
-      const template=dataRows[0];if(template){let additions='';for(const item of rows){if([...names.keys()].some(name=>name===normalize(item.name))&&!dataRows.some(row=>normalize(row.cells[nameCol]?.text)===normalize(item.name))){let raw=template.raw;const cells=scanRows(raw)[0]?.cells||[];const replacements=[];if(cells[nameCol])replacements.push([cells[nameCol],item.name]);if(cells[sharesCol]&&item.shares!==null)replacements.push([cells[sharesCol],formatLike(cells[sharesCol].text,item.shares)]);if(pctCol>=0&&cells[pctCol]&&item.percent!==null)replacements.push([cells[pctCol],formatLike(cells[pctCol].text,item.percent)]);for(const [cell,value] of replacements.reverse())raw=raw.slice(0,cell.start)+replaceCellText(cell.raw,cell.text,value)+raw.slice(cell.end);additions+=raw;found++;report.changes.push({item:item.name,oldValue:'ไม่มีแถวในโค้ดเดิม',newValue:`${item.shares===null?'':item.shares.toLocaleString('en-US')+' หุ้น'}${item.percent===null?'':` · ${item.percent.toFixed(2)}%`}`,source:item.source});}}
+      let changedTable=table;const dataRows=trs.slice(trs.indexOf(header)+1);for(const row of dataRows.slice().reverse()){const label=normalize(row.cells[nameCol]?.text);const item=names.get(label);if(!item)continue;let raw=row.raw;const replacements=[];if(row.cells[sharesCol]&&item.shares!==null)replacements.push([row.cells[sharesCol],item.sharesText]);if(pctCol>=0&&row.cells[pctCol]&&item.percent!==null)replacements.push([row.cells[pctCol],item.percentText]);for(const [cell,value] of replacements.reverse())raw=raw.slice(0,cell.start)+replaceCellText(cell.raw,cell.text,value)+raw.slice(cell.end);changedTable=changedTable.slice(0,row.start)+raw+changedTable.slice(row.end);found++;report.changes.push({item:item.name,oldValue:'ค่าจากโค้ดเดิม',newValue:`${item.shares===null?'':item.sharesText+' หุ้น'}${item.percent===null?'':` · ${item.percentText}`}`,source:item.source});}
+      const template=dataRows[0];if(template){let additions='';for(const item of rows){if([...names.keys()].some(name=>name===normalize(item.name))&&!dataRows.some(row=>normalize(row.cells[nameCol]?.text)===normalize(item.name))){let raw=template.raw;const cells=scanRows(raw)[0]?.cells||[];const replacements=[];if(cells[nameCol])replacements.push([cells[nameCol],item.name]);if(cells[sharesCol]&&item.shares!==null)replacements.push([cells[sharesCol],item.sharesText]);if(pctCol>=0&&cells[pctCol]&&item.percent!==null)replacements.push([cells[pctCol],item.percentText]);for(const [cell,value] of replacements.reverse())raw=raw.slice(0,cell.start)+replaceCellText(cell.raw,cell.text,value)+raw.slice(cell.end);additions+=raw;found++;report.changes.push({item:item.name,oldValue:'ไม่มีแถวในโค้ดเดิม',newValue:`${item.shares===null?'':item.sharesText+' หุ้น'}${item.percent===null?'':` · ${item.percentText}`}`,source:item.source});}}
         if(additions){const close=/<\/tbody\s*>/i.exec(changedTable);const at=close?close.index:changedTable.toLowerCase().lastIndexOf('</table>');if(at>=0)changedTable=changedTable.slice(0,at)+additions+changedTable.slice(at);}}
       return changedTable;
     });
