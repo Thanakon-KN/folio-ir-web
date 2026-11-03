@@ -108,17 +108,27 @@ const FolioEngine = (() => {
         const summaryBlock=/financial highlights|highlights summary|graph|chart|summary|home|overview|สรุป|กราฟ/i.test(sheetLabel+' '+sectionContext);
         const kind=explicitDetail?'detail':summaryBlock?'summary':'detail';
         const periods=candidates.map(x=>({period:x.period,col:x.col}));
+        const headerLabels=[];
+        if(firstPeriodCol===0){
+          for(let previous=ri-1;previous>=0&&row.row-all[previous].row<=2;previous--){
+            const prior=all[previous];if(prior.cells.some(cell=>periodFrom(cell.text)))break;
+            const labels=prior.cells.filter(cell=>numberFrom(cell.raw)===null&&numberFrom(cell.text)===null&&!/^(?:YoY|QoQ|Growth|%Growth|ปี|งวด)$/i.test(cell.text.trim()));
+            if(!labels.length)break;headerLabels.unshift(...labels);
+          }
+        }
+        let looseHeaderLabelsAvailable=headerLabels.length>0;
         for(let rj=ri+1;rj<all.length;rj++){
           const data=all[rj];
           if(data.row>all[rj-1].row+20) break;
           const nextPeriods=data.cells.filter(cell=>periodFrom(cell.text)),nextPartial=data.cells.filter(cell=>/^(?:Q\s*[1-4]|[1-4]\s*Q|Quarter\s*[1-4]|ไตรมาส\s*[1-4]|(?:3|6|9)\s*M|1\s*H)$/i.test(cell.text));
           if(nextPeriods.length>=2||nextPartial.length>=2)break;
           const before=data.cells.filter(cell=>cell.col<firstPeriodCol && cell.text.trim());
-          if(!before.length) continue;
+          const labelCells=before.length?before:(looseHeaderLabelsAvailable?headerLabels:[]);
+          if(!labelCells.length) continue;
           // Workbooks may put English and Thai labels in adjacent columns.
           // Keep every label for matching, and use the first label as the
           // display name so HTML can match either language.
-          const labels=[...new Set(before.map(cell=>cell.text.trim()).filter(Boolean))];
+          const labels=[...new Set(labelCells.map(cell=>cell.text.trim()).filter(Boolean))];
           const label=labels[0];
           if(periodFrom(label)) break;
           const values={}; let found=false;
@@ -129,6 +139,7 @@ const FolioEngine = (() => {
           }
           if(found && normalize(label)) {
             metrics.push({label,labels,normalized:normalize(label),kind,bookName:book.name,sheetName:sheet.name,sheet:book.name+' / '+sheet.name,row:data.row,values});
+            if(!before.length)looseHeaderLabelsAvailable=false;
           }
         }
       }
@@ -214,7 +225,7 @@ const FolioEngine = (() => {
     const valid=new Set(summary.displayPeriods.map(p=>p.id));if(selection.some(id=>!valid.has(id))||new Set(selection).size!==selection.length)throw new Error('ตัวเลือกงวดไม่ตรงกับผลตรวจ กรุณาตรวจไฟล์ใหม่');return summary.displayPeriods.filter(p=>selection.includes(p.id));
   };
   const aliases={
-    revenue:['sales','netsales','turnover','totalrevenue','revenuefromoperations','revenuefromcontractswithcustomers','salesandserviceincome','รายได้','รายได้รวม','รายได้จากการขายและบริการ','รายได้จากการขายสินค้าและการให้บริการ'],
+    revenue:['sales','netsales','turnover','totalrevenue','totalrevenues','revenuefromoperations','revenuefromcontractswithcustomers','salesandserviceincome','รายได้','รายได้รวม','รายได้จากการขายและบริการ','รายได้จากการขายสินค้าและการให้บริการ'],
     costofsales:['costofgoodsold','costofsalesandservices','ต้นทุนขาย','ต้นทุนขายและบริการ','ต้นทุนสินค้าและบริการ'],
     netprofit:['netincome','profitforperiod','profitfortheyear','netprofitfortheperiod','profitattributabletoownersoftheparent','netprofitattributabletoownersoftheparent','กำไรสุทธิ','กำไรขาดทุนสุทธิ','กำไร(ขาดทุน)สุทธิ','กำไรสุทธิส่วนที่เป็นของผู้ถือหุ้นบริษัทใหญ่'],
     grossprofit:['กำไรขั้นต้น','กำไร(ขาดทุน)ขั้นต้น'], operatingprofit:['operatingincome','profitfromoperations','กำไรจากการดำเนินงาน','กำไรจากการปฏิบัติงาน','กำไร(ขาดทุน)จากการดำเนินงาน'],
@@ -327,8 +338,7 @@ const FolioEngine = (() => {
         const startCol=tablePeriodStart,endCol=tablePeriodEnd;
         const baseCells=row.cells.filter(c=>c.endColumn<=startCol).map(c=>c.raw),trailingCells=row.cells.filter(c=>c.column>=endCol).map(c=>c.raw),valueCells=[];
         for(const id of wanted){const oldIndex=known.get(id),old=oldIndex===undefined?null:cellAtColumn(row,oldIndex);const source=metric.values[id];let value;
-          if(mode==='add'&&old)value=old.text;
-          else if(source)value=formatFinancialValue(old?.text??cellAtColumn(row,periodCols[0].column)?.text??source.text,source.value,metric.label);
+          if(source)value=formatFinancialValue(old?.text??cellAtColumn(row,periodCols[0].column)?.text??source.text,source.value,metric.label);
           else if(old)value=old.text;
           else {value='';report.unmatched.push(`HTML “${labelCell.text}” ไม่มีค่า ${formatPeriodLabel(sourcePeriod.get(id)||{year:Number(id.slice(0,4)),quarter:Number(id.match(/-Q([1-4])/)?.[1]||0)},language)} จาก workbook`);}
           if(old){let raw=replaceCellText(old.raw,old.text,value);valueCells.push(raw);}else{const template=cellAtColumn(row,periodCols[0].column);if(template)valueCells.push(replaceCellText(template.raw,template.text,value));}
@@ -449,14 +459,17 @@ const FolioEngine = (() => {
         const objectKey=scopeKey(code,parent);if(objectKey)labels.push(objectKey);
       }
       let metric=null;for(const label of labels){metric=findMetric(summary.metrics,label,'summary',selected);if(metric)break;}
-      if(!metric){report.unmatched.push('ไม่พบแถวสรุปใน workbook ที่ตรงกับกราฟ '+(labels[0]||'ไม่มีชื่อ'));continue;}
       const oldDataTokens=parseArray(dataArray.inner),oldIndex=new Map();oldPeriods.forEach((period,index)=>{if(period)oldIndex.set(period.id,index);});
+      const seriesProperties=directArrayProperties(code,scope,scopes).filter(series=>series.name!=='period'&&series.name!=='dataset'&&!/markPoint|axis|annotation|color|symbol|label/i.test(series.name));
+      const matchedSeries=seriesProperties.map(series=>({series,values:parseArray(series.inner),metric:findMetric(summary.metrics,series.name,'summary',selected)})).filter(({values,metric})=>metric&&values.length===oldPeriodTokens.length&&values.every(value=>value===null||numberFrom(value)!==null));
+      if(!metric&&matchedSeries.length===1)metric=matchedSeries[0].metric;
+      if(!metric){report.unmatched.push('ไม่พบแถวสรุปใน workbook ที่ตรงกับกราฟ '+(labels[0]||'ไม่มีชื่อ'));continue;}
       const isPeriodic=quarterly||periodicName||oldPeriods.some(isSubAnnual);
       const targetPeriods=selected.filter(p=>isSubAnnual(p)===isPeriodic);
       const nextIds=[],nextPeriods=[],nextData=[];
       for(const period of targetPeriods){
         const at=oldIndex.get(period.id),source=metric.values[period.id];
-        const keepOld=at!==undefined&&(mode==='add'||!source);
+        const keepOld=at!==undefined&&!source;
         if(keepOld){nextIds.push(period.id);nextPeriods.push(arrayLiteral(oldPeriodTokens[at],oldPeriodTokens[0], 'period',period,sourceThai,language));nextData.push(oldDataTokens[at]??'null');}
         else if(source){nextIds.push(period.id);nextPeriods.push(arrayLiteral(period.id,oldPeriodTokens[0],'period',period,sourceThai,language));nextData.push(String(Number(source.value.toPrecision?.(12)??source.value)));}
         else if(at!==undefined){nextIds.push(period.id);nextPeriods.push(arrayLiteral(oldPeriodTokens[at],oldPeriodTokens[0],'period',period,sourceThai,language));nextData.push(oldDataTokens[at]??'null');report.unmatched.push(`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook · คงค่าเดิมไว้`);}
@@ -465,14 +478,11 @@ const FolioEngine = (() => {
       const signature=scope.start+':'+dataArray.open;if(handled.has(signature))continue;handled.add(signature);
       patches.push({start:periodArray.open+1,end:periodArray.close,text:formatArrayItems(nextPeriods,periodArray.inner)});
       patches.push({start:dataArray.open+1,end:dataArray.close,text:formatArrayItems(nextData,dataArray.inner)});
-      for(const series of directArrayProperties(code,scope,scopes)){
-        if(series.name==='period'||series.name==='dataset'||/markPoint|axis|annotation|color|symbol|label/i.test(series.name))continue;
-        const values=parseArray(series.inner);if(values.length!==oldPeriodTokens.length||!values.every(value=>value===null||numberFrom(value)!==null))continue;
-        const seriesMetric=findMetric(summary.metrics,series.name,'summary',selected);if(!seriesMetric)continue;
+      for(const {series,values,metric:seriesMetric} of matchedSeries){
         const aligned=[];for(const period of targetPeriods){
           if(!nextIds.includes(period.id))continue;
           const at=oldIndex.get(period.id),source=seriesMetric.values[period.id];
-          if(at!==undefined&&(mode==='add'||!source))aligned.push(values[at]??'null');
+          if(at!==undefined&&!source)aligned.push(values[at]??'null');
           else if(source)aligned.push(String(Number(source.value.toPrecision?.(12)??source.value)));
           else aligned.push(at===undefined?'null':values[at]??'null');
         }
@@ -493,7 +503,7 @@ const FolioEngine = (() => {
     const html=payload.html?updateFinancialHtml(payload.html,summary,periods,mode,language,report):'';
     const javascript=payload.javascript?updateFinancialJs(payload.javascript,summary,periods,mode,report,language):'';
     report.notes.push('ภาษา HTML ที่เลือก: '+({en:'English',th:'ภาษาไทย'}[language]||'English'));
-    if(mode==='add'&&!summary.sourcePeriods.some(p=>!summary.existingPeriods.some(o=>o.id===p.id)))report.notes.push('ไม่พบงวดใหม่ในไฟล์; โหมดเพิ่มจึงคงค่าของงวดซ้ำไว้');
+    if(mode==='add'&&!summary.sourcePeriods.some(p=>!summary.existingPeriods.some(o=>o.id===p.id)))report.notes.push('ไม่พบงวดใหม่ในไฟล์; โหมดเพิ่มจึงอัปเดตตัวเลขของงวดที่เลือกจาก workbook');
     return {html,javascript,...report};
   };
   const updateShareholders=(payload,summary)=>{
