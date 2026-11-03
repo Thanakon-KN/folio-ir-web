@@ -102,7 +102,11 @@ const FolioEngine = (() => {
           if(nextPeriods.length>=2||nextQuarters.length>=2)break;
           const before=data.cells.filter(cell=>cell.col<firstPeriodCol && cell.text.trim());
           if(!before.length) continue;
-          const label=before[before.length-1].text;
+          // Workbooks may put English and Thai labels in adjacent columns.
+          // Keep every label for matching, and use the first label as the
+          // display name so HTML can match either language.
+          const labels=[...new Set(before.map(cell=>cell.text.trim()).filter(Boolean))];
+          const label=labels[0];
           if(periodFrom(label)) break;
           const values={}; let found=false;
           for(const item of periods){
@@ -111,7 +115,7 @@ const FolioEngine = (() => {
             if(val!==null){values[item.period.id]={value:val,text:cell?.text||String(val),address:cell?.address||''};found=true;}
           }
           if(found && normalize(label)) {
-            metrics.push({label,normalized:normalize(label),kind,bookName:book.name,sheetName:sheet.name,sheet:book.name+' / '+sheet.name,row:data.row,values});
+            metrics.push({label,labels,normalized:normalize(label),kind,bookName:book.name,sheetName:sheet.name,sheet:book.name+' / '+sheet.name,row:data.row,values});
           }
         }
       }
@@ -223,7 +227,7 @@ const FolioEngine = (() => {
     return overlap/(at.size+bt.size-overlap);
   };
   const findMetric=(metrics,label,kind='',periods=[])=>{
-    const ranked=metrics.map(metric=>({metric,score:labelSimilarity(label,metric.label),coverage:periods.filter(period=>metric.values[period.id]).length})).filter(x=>x.score>=0.55);
+    const ranked=metrics.map(metric=>({metric,score:Math.max(...(metric.labels?.length?metric.labels:[metric.label]).map(candidate=>labelSimilarity(label,candidate))),coverage:periods.filter(period=>metric.values[period.id]).length})).filter(x=>x.score>=0.55);
     if(!ranked.length)return null;
     ranked.sort((a,b)=>b.score-a.score||b.coverage-a.coverage||(kind&&a.metric.kind===kind?-1:0)-(kind&&b.metric.kind===kind?-1:0));
     const top=ranked[0],sameScore=ranked.filter(x=>Math.abs(x.score-top.score)<0.035&&x.coverage===top.coverage);
