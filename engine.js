@@ -501,6 +501,10 @@ const FolioEngine = (() => {
   function updateFinancialJs(code,summary,selected,mode,report,language='en'){
     const scopes=scanObjectScopes(code),patches=[],handled=new Set(),qoqPatches=new Set();let changed=0;
     const sourceThai=/[\u0E00-\u0E7F]/.test(code);
+    const shortPeriodTemplate=scopes.map(scope=>arrayProperty(code,scope,'period',scopes)).filter(Boolean).flatMap(array=>rawArrayItems(array.inner)).find(token=>{
+      const value=String(parseArray(token)[0]??'').trim();
+      return /(?:Q\s*[1-4]|[1-4]\s*Q|(?:Quarter|ไตรมาส)\s*[1-4])\s*[/ .-]\s*\d{2}\s*$/i.test(value);
+    })||'';
     for(const scope of scopes){
       const periodArray=arrayProperty(code,scope,'period',scopes),dataArray=arrayProperty(code,scope,'dataset',scopes);
       if(!periodArray)continue;
@@ -550,7 +554,7 @@ const FolioEngine = (() => {
           }
         }
         if(updates.size){
-          patches.push({start:periodArray.open+1,end:periodArray.close,text:formatArrayItems(targetPeriods.map((period,index)=>{const at=oldIndex.get(period.id);return at!==undefined?oldPeriodRaw[at]:arrayLiteral(period.id,oldPeriodRaw[0],'period',period,sourceThai,language);}),periodArray.inner)});
+          patches.push({start:periodArray.open+1,end:periodArray.close,text:formatArrayItems(targetPeriods.map((period,index)=>{const at=oldIndex.get(period.id);return at!==undefined?oldPeriodRaw[at]:arrayLiteral(period.id,oldPeriodRaw[0]||shortPeriodTemplate,'period',period,sourceThai,language);}),periodArray.inner)});
           changed+=updates.size;
         }
         continue;
@@ -581,9 +585,9 @@ const FolioEngine = (() => {
       for(const period of targetPeriods){
         const at=oldIndex.get(period.id),source=sourceFor(metric,scopeComparisonMetric,period,comparisonKind);
         const keepOld=at!==undefined&&!source;
-        if(keepOld){nextIds.push(period.id);nextPeriods.push(oldPeriodRaw[at]||arrayLiteral(oldPeriodTokens[at],oldPeriodRaw[0], 'period',period,sourceThai,language));nextData.push(oldDataTokens[at]??'null');report.unmatched.push(`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook · คงค่าเดิมใน JavaScript ไว้`);}
-        else if(source){nextIds.push(period.id);nextPeriods.push(at!==undefined?oldPeriodRaw[at]:arrayLiteral(period.id,oldPeriodRaw[0],'period',period,sourceThai,language));nextData.push(source.value===null?emptyArrayValue(source,oldDataTokens[at],oldDataTokens[0]):String(Number(source.value.toPrecision?.(12)??source.value)));}
-        else if(at!==undefined){nextIds.push(period.id);nextPeriods.push(oldPeriodRaw[at]||arrayLiteral(oldPeriodTokens[at],oldPeriodRaw[0],'period',period,sourceThai,language));nextData.push(oldDataTokens[at]??'null');report.unmatched.push(`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook · คงค่าเดิมไว้`);}
+        if(keepOld){nextIds.push(period.id);nextPeriods.push(oldPeriodRaw[at]||arrayLiteral(oldPeriodTokens[at],oldPeriodRaw[0]||shortPeriodTemplate, 'period',period,sourceThai,language));nextData.push(oldDataTokens[at]??'null');report.unmatched.push(`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook · คงค่าเดิมใน JavaScript ไว้`);}
+        else if(source){nextIds.push(period.id);nextPeriods.push(at!==undefined?oldPeriodRaw[at]:arrayLiteral(period.id,oldPeriodRaw[0]||shortPeriodTemplate,'period',period,sourceThai,language));nextData.push(source.value===null?emptyArrayValue(source,oldDataTokens[at],oldDataTokens[0]):String(Number(source.value.toPrecision?.(12)??source.value)));}
+        else if(at!==undefined){nextIds.push(period.id);nextPeriods.push(oldPeriodRaw[at]||arrayLiteral(oldPeriodTokens[at],oldPeriodRaw[0]||shortPeriodTemplate,'period',period,sourceThai,language));nextData.push(oldDataTokens[at]??'null');report.unmatched.push(`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook · คงค่าเดิมไว้`);}
         else report.unmatched.push(`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook และกราฟเดิม`);
       }
       const signature=scope.start+':'+dataArray.open;if(handled.has(signature))continue;handled.add(signature);
