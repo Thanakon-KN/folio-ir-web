@@ -599,23 +599,6 @@ const FolioEngine = (() => {
     let output=code;for(const patch of patches.sort((a,b)=>b.start-a.start))output=output.slice(0,patch.start)+patch.text+output.slice(patch.end);
     return output;
   }
-  const parseChartPreview=code=>{
-    const scopes=scanObjectScopes(String(code??'')),charts=[];
-    const literalText=token=>{const value=String(token??'').trim();return /^(['"])[\s\S]*\1$/.test(value)?parseArray(value)[0]:value;};
-    for(const scope of scopes){
-      const periods=arrayProperty(code,scope,'period',scopes),dataset=arrayProperty(code,scope,'dataset',scopes);if(!periods||!dataset)continue;
-      const periodTokens=parseArray(periods.inner),values=rawArrayItems(dataset.inner);if(!periodTokens.length||!values.length)continue;
-      const parents=scopes.filter(item=>item.start<scope.start&&item.end>scope.end).sort((a,b)=>(a.end-a.start)-(b.end-b.start));
-      let title='',unit='';
-      for(const parent of [...parents].reverse()){
-        if(!title){const legend=arrayProperty(code,parent,'legend',scopes);if(legend)title=parseArray(legend.inner).find(value=>typeof value==='string'&&value.trim())||'';}
-        if(!unit)unit=directTextProperty(code,parent,'unit',scopes);
-      }
-      const key=[scope,...parents].map(item=>scopeKey(code,item)).find(value=>value&&!/^(?:source|yearly|annual|quarterly|chart|window)$/i.test(value))||'';
-      charts.push({key,title:title||key||'Chart data',unit,periodType:scopeKey(code,scope)||'period',rows:periodTokens.map((period,index)=>({period:String(period),value:literalText(values[index])??''}))});
-    }
-    return charts;
-  };
   const updateFinancial=(payload,summary,selection,mode,language='en')=>{
     const periods=validateSelection(selection,summary);if(!['add','replace'].includes(mode))throw new Error('เลือกวิธีเพิ่มหรือแทนที่ข้อมูล');
     const report={changes:[],unmatched:[],notes:[]};
@@ -709,6 +692,6 @@ const FolioEngine = (() => {
     const {target}=unique[0],raw=html.slice(target.start,target.end),old=plainText(inner(target)),replacement=replaceCellText(raw,old,value);
     return {html:html.slice(0,target.start)+replacement+html.slice(target.end),count:1};
   }
-  return {parseWorkbook,inspect,periodFrom,extractExistingPeriods,extractFinancial,parseChartPreview,updateFinancial,updateShareholders,plainText,numberFrom,uniquePeriods};
+  return {parseWorkbook,inspect,periodFrom,extractExistingPeriods,extractFinancial,updateFinancial,updateShareholders,plainText,numberFrom,uniquePeriods};
 })();
 window.FolioEngine=FolioEngine;
