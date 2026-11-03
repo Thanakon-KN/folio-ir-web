@@ -60,15 +60,16 @@ const FolioEngine = (() => {
       const wb=XLSX.read(buffer,{type:'array',cellDates:false,cellNF:true,cellText:true});
       const sheets=wb.SheetNames.map(name=>{
         const ws=wb.Sheets[name]; if(!ws['!ref']) return {name,rows:[]};
-        const range=XLSX.utils.decode_range(ws['!ref']), rows=[];
+          const range=XLSX.utils.decode_range(ws['!ref']), rows=[];
         for(let r=range.s.r;r<=range.e.r;r++){
-          const cells=[];
+          const cells=[],grid=[];
           for(let c=range.s.c;c<=range.e.c;c++){
             const address=XLSX.utils.encode_cell({r,c}), cell=ws[address];
             const raw=cell?.v ?? '', text=cell?.w ?? (raw instanceof Date?raw.toISOString().slice(0,10):String(raw));
-            if(String(text).trim()||String(raw).trim()) cells.push({address,row:r+1,col:c,text:String(text).trim(),raw,format:cell?.z||''});
+            const value={address,row:r+1,col:c,text:String(text).trim(),raw,format:cell?.z||'',present:Boolean(cell)};grid.push(value);
+            if(String(text).trim()||String(raw).trim()) cells.push(value);
           }
-          if(cells.length) rows.push({row:r+1,cells});
+          if(cells.length) rows.push({row:r+1,cells,grid});
         }
         return {name,rows};
       });
@@ -86,7 +87,7 @@ const FolioEngine = (() => {
         const durationOnly=row.cells.filter(cell=>/^(?:(?:3|6|9)\s*M|1\s*H)$/i.test(cell.text.trim()));
         const partialPeriods=[...quarterOnly.map(x=>x.cell),...durationOnly];
         const direct=row.cells.map(cell=>({cell,period:periodFrom(cell.text)})).filter(x=>x.period);
-        const hasNumericBelow=col=>{for(let i=ri+1;i<Math.min(all.length,ri+31);i++){const next=all[i],nextPeriods=next.cells.filter(cell=>periodFrom(cell.text)),nextPartial=next.cells.filter(cell=>/^(?:Q\s*[1-4]|[1-4]\s*Q|Quarter\s*[1-4]|ไตรมาส\s*[1-4]|(?:3|6|9)\s*M|1\s*H)$/i.test(cell.text));if(nextPeriods.length>=2||nextPartial.length>=2)break;const cell=next.cells.find(item=>item.col===col);if(cell&&(numberFrom(cell.raw)!==null||numberFrom(cell.text)!==null))return true;}return false;};
+        const hasNumericBelow=col=>{for(let i=ri+1;i<Math.min(all.length,ri+31);i++){const next=all[i],nextPeriods=next.cells.filter(cell=>periodFrom(cell.text)),nextPartial=next.cells.filter(cell=>/^(?:Q\s*[1-4]|[1-4]\s*Q|Quarter\s*[1-4]|ไตรมาส\s*[1-4]|(?:3|6|9)\s*M|1\s*H)$/i.test(cell.text));if(nextPeriods.length>=2||nextPartial.length>=2)break;const grid=next.grid||next.cells,cell=grid.find(item=>item.col===col);if(cell&&(numberFrom(cell.raw)!==null||numberFrom(cell.text)!==null||/^[-–—]$/.test(cell.text)))return true;if(grid.some(item=>item.col!==col&&(numberFrom(item.raw)!==null||numberFrom(item.text)!==null)))return true;}return false;};
         const periodsByCol=[];
         if(partialPeriods.length){
           for(const item of partialPeriods){
@@ -108,11 +109,12 @@ const FolioEngine = (() => {
         const summaryBlock=/financial highlights|highlights summary|graph|chart|summary|home|overview|สรุป|กราฟ/i.test(sheetLabel+' '+sectionContext);
         const kind=explicitDetail?'detail':summaryBlock?'summary':'detail';
         const periods=candidates.map(x=>({period:x.period,col:x.col}));
+        const comparisonColumns=row.cells.map(cell=>({cell,type:comparisonType(cell.text)})).filter(item=>item.type&&!periodFrom(item.cell.text)).map(item=>{const owner=periods.filter(period=>period.col<=item.cell.col).sort((a,b)=>b.col-a.col)[0]||[...periods].sort((a,b)=>Math.abs(a.col-item.cell.col)-Math.abs(b.col-item.cell.col))[0];return owner?{type:item.type,col:item.cell.col,period:owner.period}:null;}).filter(Boolean);
         const headerLabels=[];
         if(firstPeriodCol===0){
           for(let previous=ri-1;previous>=0&&row.row-all[previous].row<=2;previous--){
             const prior=all[previous];if(prior.cells.some(cell=>periodFrom(cell.text)))break;
-            const labels=prior.cells.filter(cell=>numberFrom(cell.raw)===null&&numberFrom(cell.text)===null&&!/^(?:YoY|QoQ|Growth|%Growth|ปี|งวด)$/i.test(cell.text.trim()));
+            const labels=prior.cells.filter(cell=>numberFrom(cell.raw)===null&&numberFrom(cell.text)===null&&!/^(?:ปี|งวด)$/i.test(cell.text.trim()));
             if(!labels.length)break;headerLabels.unshift(...labels);
           }
         }
@@ -131,14 +133,17 @@ const FolioEngine = (() => {
           const labels=[...new Set(labelCells.map(cell=>cell.text.trim()).filter(Boolean))];
           const label=labels[0];
           if(periodFrom(label)) break;
-          const values={}; let found=false;
+          const values={},comparisons={}; let found=false;
           for(const item of periods){
-            const cell=data.cells.find(x=>x.col===item.col);
+            const cell=(data.grid||data.cells).find(x=>x.col===item.col);
             let val=numberFrom(cell?.raw);if(val===null)val=numberFrom(cell?.text);
             if(val!==null){values[item.period.id]={value:val,text:cell?.text||String(val),address:cell?.address||''};found=true;}
+            else if(cell&&(cell.present||/^[-–—]$/.test(cell.text))){values[item.period.id]={value:null,text:cell.text,address:cell.address||'',empty:true};if(cell.present||cell.text)found=true;}
           }
+          for(const comparison of comparisonColumns){const cell=(data.grid||data.cells).find(x=>x.col===comparison.col),key=comparison.period.id+':'+comparison.type;let val=numberFrom(cell?.raw);if(val===null)val=numberFrom(cell?.text);if(val!==null){comparisons[key]={value:val,text:cell?.text||String(val),address:cell?.address||''};found=true;}else if(cell&&(cell.present||/^[-–—]$/.test(cell.text))){comparisons[key]={value:null,text:cell.text,address:cell.address||'',empty:true};if(cell.present||cell.text)found=true;}}
+          if(found)for(const item of periods)if(!values[item.period.id])values[item.period.id]={value:null,text:'',empty:true};
           if(found && normalize(label)) {
-            metrics.push({label,labels,normalized:normalize(label),kind,bookName:book.name,sheetName:sheet.name,sheet:book.name+' / '+sheet.name,row:data.row,values});
+            metrics.push({label,labels,normalized:normalize(label),kind,bookName:book.name,sheetName:sheet.name,sheet:book.name+' / '+sheet.name,row:data.row,values,comparisons});
             if(!before.length)looseHeaderLabelsAvailable=false;
           }
         }
@@ -150,16 +155,16 @@ const FolioEngine = (() => {
     const bySourceRow=new Map();
     for(const metric of metrics){
       const key=[metric.normalized,metric.sheetName,metric.kind,metric.bookName,metric.row].join('|');
-      const prior=bySourceRow.get(key);if(prior)Object.assign(prior.values,metric.values);else bySourceRow.set(key,{...metric,values:{...metric.values}});
+      const prior=bySourceRow.get(key);if(prior){Object.assign(prior.values,metric.values);Object.assign(prior.comparisons,metric.comparisons||{});}else bySourceRow.set(key,{...metric,values:{...metric.values},comparisons:{...(metric.comparisons||{})}});
     }
     const bySection=new Map();for(const metric of bySourceRow.values()){const key=[metric.normalized,metric.sheetName,metric.kind].join('|');if(!bySection.has(key))bySection.set(key,[]);bySection.get(key).push(metric);}
     const consolidated=[];
     for(const group of bySection.values()){
       let combined=null;
       for(const metric of group){
-        const conflict=combined&&(metric.bookName===combined.bookName||Object.entries(metric.values).some(([id,item])=>combined.values[id]&&combined.values[id].value!==item.value));
+        const conflict=combined&&(metric.bookName===combined.bookName||Object.entries(metric.values).some(([id,item])=>combined.values[id]&&combined.values[id].value!==item.value)||Object.entries(metric.comparisons||{}).some(([id,item])=>combined.comparisons?.[id]&&combined.comparisons[id].value!==item.value));
         if(conflict){consolidated.push(...group);combined=null;break;}
-        if(!combined)combined={...metric,values:{...metric.values}};else Object.assign(combined.values,metric.values);
+        if(!combined)combined={...metric,values:{...metric.values},comparisons:{...(metric.comparisons||{})}};else{Object.assign(combined.values,metric.values);Object.assign(combined.comparisons,metric.comparisons||{});}
       }
       if(combined)consolidated.push(combined);
     }
@@ -242,7 +247,10 @@ const FolioEngine = (() => {
     for(const [canonical,variants] of Object.entries(aliases))if(key===canonical||variants.some(item=>normalize(item)===key))return canonical;
     return key;
   };
+  const comparisonType=value=>{const text=plainText(value);if(/\b(?:y\s*[-/]?\s*o\s*[-/]?\s*y|year[ -]*over[ -]*year)\b|ปีก่อน/i.test(text))return 'yoy';if(/\b(?:q\s*[-/]?\s*o\s*[-/]?\s*q|quarter[ -]*over[ -]*quarter)\b|ไตรมาสก่อน/i.test(text))return 'qoq';return '';};
   const labelSimilarity=(left,right)=>{
+    const leftComparison=comparisonType(left),rightComparison=comparisonType(right);
+    if(leftComparison||rightComparison){if(leftComparison!==rightComparison)return 0;const strip=value=>normalize(plainText(value).replace(/\b(?:yoy|qoq|year[ -]*over[ -]*year|quarter[ -]*over[ -]*quarter|growth|change|comparison)\b|ปีก่อน|ไตรมาสก่อน/gi,''));const a=strip(left),b=strip(right);if(a===b)return 1;if(!a||!b)return 0;const at=new Set(a.match(/[\p{L}\p{N}]+/gu)||[]),bt=new Set(b.match(/[\p{L}\p{N}]+/gu)||[]);let overlap=0;for(const token of at)if(bt.has(token))overlap++;return overlap/(at.size+bt.size-overlap);}
     const a=canonicalLabel(left),b=canonicalLabel(right);if(!a||!b)return 0;if(a===b)return 1;
     if(a.length>3&&b.length>3&&(a.includes(b)||b.includes(a)))return Math.min(a.length,b.length)/Math.max(a.length,b.length)*0.96;
     const at=new Set((plainText(left).toLowerCase().match(/[\p{L}\p{N}]+/gu)||[]).filter(x=>!['total','million','baht','บาท','summary','detailed','the','of'].includes(x)));
@@ -297,6 +305,23 @@ const FolioEngine = (() => {
     const result=Math.abs(value).toLocaleString('en-US',{useGrouping:grouped,minimumFractionDigits:places,maximumFractionDigits:places});
     return sign+result+(/%/.test(prior)?'%':'');
   }
+  function emptyFinancialValue(source,previous){
+    const sourceText=String(source?.text??'').trim();if(/^[-–—]$/.test(sourceText))return sourceText;
+    const original=String(previous??''),prior=plainText(original).trim();
+    if(!prior||/^[-–—]$/.test(prior)||numberFrom(prior)===0)return original;
+    return '';
+  }
+  function financialValueCell(oldCell,templateCell,source,label){
+    const cell=oldCell||templateCell;if(!cell)return '<td></td>';
+    const previous=oldCell?.text??templateCell?.text??'';
+    const value=source?(source.value===null?emptyFinancialValue(source,previous):formatFinancialValue(previous,source.value,label)):oldCell?oldCell.text:emptyFinancialValue({text:''},previous);
+    return replaceCellText(cell.raw,cell.text,value);
+  }
+  function emptyArrayValue(source,previous,fallback){
+    const sourceText=String(source?.text??'').trim();if(/^[-–—]$/.test(sourceText))return JSON.stringify(sourceText);
+    const preserve=value=>{if(value===null)return 'null';if(value===undefined)return null;if(typeof value==='number')return value===0?'0':null;const text=String(value).trim();if(!text)return '""';if(/^[-–—]$/.test(text)||numberFrom(text)===0)return JSON.stringify(value);return null;};
+    return preserve(previous)??preserve(fallback)??'null';
+  }
   function replaceRowCells(row,newCells){
     let raw=row.raw;for(let i=row.cells.length-1;i>=0;i--){const c=row.cells[i];raw=raw.slice(0,c.start)+raw.slice(c.end);}const close=raw.lastIndexOf('</tr>');return close<0?row.raw:raw.slice(0,close)+newCells.join('')+raw.slice(close);
   }
@@ -324,7 +349,10 @@ const FolioEngine = (() => {
       rows.forEach((row,index)=>{const ps=row.cells.map(c=>({period:periodFrom(c.text),column:c.column,span:c.span})).filter(x=>x.period);if(ps.length>periodCols.length&&ps.length>=1){periodCols=ps;headIndex=index;}});
       if(headIndex<0||!periodCols.length)return table;
       if(periodCols.some(period=>period.span!==1)){report.unmatched.push('พบหัวงวดที่ใช้ colspan · คงตารางเดิมไว้เพื่อไม่ให้คอลัมน์เลื่อน');return table;}
-      const tablePeriodStart=Math.min(...periodCols.map(p=>p.column)),tablePeriodEnd=Math.max(...periodCols.map(p=>p.column+p.span));
+      const comparisonCols=rows[headIndex].cells.map(cell=>({cell,type:comparisonType(cell.text)})).filter(item=>item.type&&!periodFrom(item.cell.text)).map(item=>{const owner=periodCols.filter(period=>period.column<=item.cell.column).sort((a,b)=>b.column-a.column)[0]||[...periodCols].sort((a,b)=>Math.abs(a.column-item.cell.column)-Math.abs(b.column-item.cell.column))[0];return owner?{type:item.type,column:item.cell.column,period:owner.period}:null;}).filter(Boolean);
+      const comparisonTypes=[...new Set(comparisonCols.map(item=>item.type))],comparisonKnown=new Map(comparisonCols.map(item=>[item.period.id+':'+item.type,item.column]));
+      const dataColumns=[...periodCols.map(item=>({column:item.column,span:item.span})),...comparisonCols.map(item=>({column:item.column,span:1}))];
+      const tablePeriodStart=Math.min(...dataColumns.map(p=>p.column)),tablePeriodEnd=Math.max(...dataColumns.map(p=>p.column+p.span));
       const unsafeRow=rows.find((row,index)=>index!==headIndex&&row.cells.some(cell=>cell.span>1&&cell.column<tablePeriodEnd&&cell.endColumn>tablePeriodStart)&&targetLabelCells(row,periodCols,language).some(cell=>findMetric(summary.metrics,cell.text,'detail',selected)));
       if(unsafeRow){report.unmatched.push(`ตารางมี colspan ในแถว “${metricLabelCell(unsafeRow,periodCols)?.text||'ไม่ทราบชื่อ'}” · คงตารางเดิมไว้เพื่อไม่ให้ข้อมูลเหลื่อม`);return table;}
       const known=new Map(periodCols.map(x=>[x.period.id,x.column]));const wanted=selected.map(p=>p.id);const sourcePeriod=new Map(summary.displayPeriods.map(p=>[p.id,p]));
@@ -336,19 +364,17 @@ const FolioEngine = (() => {
         if(!metric){const containsNumber=periodCols.some(period=>numberFrom(cellAtColumn(row,period.column)?.text)!==null);if(containsNumber)report.unmatched.push(`HTML “${labelCell.text}” มีค่าตัวเลขแต่จับคู่กับแถว workbook ไม่ได้ · คงแถวเดิมไว้`);continue;}
         matched=true;
         const startCol=tablePeriodStart,endCol=tablePeriodEnd;
-        const baseCells=row.cells.filter(c=>c.endColumn<=startCol).map(c=>c.raw),trailingCells=row.cells.filter(c=>c.column>=endCol).map(c=>c.raw),valueCells=[];
-        for(const id of wanted){const oldIndex=known.get(id),old=oldIndex===undefined?null:cellAtColumn(row,oldIndex);const source=metric.values[id];let value;
-          if(source)value=formatFinancialValue(old?.text??cellAtColumn(row,periodCols[0].column)?.text??source.text,source.value,metric.label);
-          else if(old)value=old.text;
-          else {value='';report.unmatched.push(`HTML “${labelCell.text}” ไม่มีค่า ${formatPeriodLabel(sourcePeriod.get(id)||{year:Number(id.slice(0,4)),quarter:Number(id.match(/-Q([1-4])/)?.[1]||0)},language)} จาก workbook`);}
-          if(old){let raw=replaceCellText(old.raw,old.text,value);valueCells.push(raw);}else{const template=cellAtColumn(row,periodCols[0].column);if(template)valueCells.push(replaceCellText(template.raw,template.text,value));}
+        const baseCells=row.cells.filter(c=>c.endColumn<=startCol).map(c=>c.raw),trailingCells=row.cells.filter(c=>c.column>=endCol).map(c=>c.raw),valueCells=[],periodTemplate=cellAtColumn(row,periodCols[0].column),comparisonTemplate=comparisonCols.length?cellAtColumn(row,comparisonCols[0].column):null;
+        for(const id of wanted){const oldIndex=known.get(id),old=oldIndex===undefined?null:cellAtColumn(row,oldIndex),source=metric.values[id];valueCells.push(financialValueCell(old,periodTemplate,source,metric.label));
+          if(!source&&oldIndex===undefined)report.unmatched.push(`HTML “${labelCell.text}” ไม่มีค่า ${formatPeriodLabel(sourcePeriod.get(id)||{year:Number(id.slice(0,4)),quarter:Number(id.match(/-Q([1-4])/)?.[1]||0)},language)} จาก workbook`);
+          for(const type of comparisonTypes){const compareColumn=comparisonKnown.get(id+':'+type),oldCompare=compareColumn===undefined?null:cellAtColumn(row,compareColumn),sourceCompare=metric.comparisons?.[id+':'+type];valueCells.push(financialValueCell(oldCompare,oldCompare||comparisonTemplate||periodTemplate,sourceCompare,metric.label+' '+type));if(sourceCompare&&sourceCompare.value!==null)matched=true;}
         }
         const newRaw=replaceRowCells(row,[...baseCells,...valueCells,...trailingCells]);
         if(newRaw!==row.raw){changed=true;tableRows[ri]={...row,raw:newRaw};report.changes.push({item:labelCell.text,oldValue:'ตารางเดิม',newValue:wanted.map(id=>formatPeriodLabel(sourcePeriod.get(id)||{year:Number(id.slice(0,4)),quarter:Number(id.match(/-Q([1-4])/)?.[1]||0)},language)).join(', '),source:metric.sheet+' row '+metric.row});}
       }
       // Restrict rewriting to tables containing recognizable financial metric rows.
       if(!tableRows.some((row,i)=>i!==headIndex&&targetLabelCells(row,periodCols,language).some(cell=>findMetric(summary.metrics,cell.text,'detail',selected))))return table;
-      const header=tableRows[headIndex],firstPeriod=Math.min(...periodCols.map(p=>p.column)),lastPeriod=Math.max(...periodCols.map(p=>p.column+p.span));const base=header.cells.filter(c=>c.endColumn<=firstPeriod).map(c=>c.raw),trailing=header.cells.filter(c=>c.column>=lastPeriod).map(c=>c.raw);const template=cellAtColumn(header,periodCols[0].column);const headCells=wanted.map(id=>{const found=known.get(id),cell=found===undefined?template:cellAtColumn(header,found),period=sourcePeriod.get(id)||{year:Number(id.slice(0,4)),quarter:Number(id.match(/-Q([1-4])/)?.[1]||0)},label=formatPeriodLabel(period,language);return cell?replaceCellText(cell.raw,cell.text,label):`<th>${label}</th>`;});
+      const header=tableRows[headIndex],firstPeriod=tablePeriodStart,lastPeriod=tablePeriodEnd;const base=header.cells.filter(c=>c.endColumn<=firstPeriod).map(c=>c.raw),trailing=header.cells.filter(c=>c.column>=lastPeriod).map(c=>c.raw);const template=cellAtColumn(header,periodCols[0].column),comparisonHeaderTemplate=comparisonCols.length?cellAtColumn(header,comparisonCols[0].column):null,headCells=[];for(const id of wanted){const found=known.get(id),cell=found===undefined?template:cellAtColumn(header,found),period=sourcePeriod.get(id)||{year:Number(id.slice(0,4)),quarter:Number(id.match(/-Q([1-4])/)?.[1]||0)},label=formatPeriodLabel(period,language);headCells.push(cell?replaceCellText(cell.raw,cell.text,label):`<th>${label}</th>`);for(const type of comparisonTypes){const compareColumn=comparisonKnown.get(id+':'+type),compareCell=compareColumn===undefined?comparisonHeaderTemplate:cellAtColumn(header,compareColumn);headCells.push(compareCell?replaceCellText(compareCell.raw,compareCell.text,type.toUpperCase()):`<th>${type.toUpperCase()}</th>`);}}
       tableRows[headIndex]={...header,raw:replaceRowCells(header,[...base,...headCells,...trailing])};
       // Apply row-level column filtering/insertion only if the table header exposes period columns.
       return tableRows.map((row,i)=>({row,i})).sort((a,b)=>b.row.start-a.row.start).reduce((result,item)=>result.slice(0,item.row.start)+item.row.raw+result.slice(item.row.end),table);
@@ -370,7 +396,7 @@ const FolioEngine = (() => {
       let metric=findMetric(summary.metrics,context,'summary',selected)||findMetric(summary.metrics,context,'detail',selected);
       if(!metric||!latest||!metric.values[latest.id])continue;
       const source=metric.values[latest.id],old=tag[0].match(/(?:\:number|\bnumber)\s*=\s*(["'])(.*?)\1/i);
-      if(!old)continue;const value=formatFinancialValue(old[2],source.value,metric.label);
+      if(!old)continue;const value=source.value===null?emptyFinancialValue(source,old[2]):formatFinancialValue(old[2],source.value,metric.label);
       const replacement=tag[0].replace(old[0],old[0].replace(old[2],value));
       output=output.slice(0,start)+replacement+output.slice(start+tag[0].length);changed++;
       report.changes.push({item:context||metric.label,oldValue:old[2],newValue:value,source:source.address?metric.sheet+' row '+metric.row+' · '+source.address:metric.sheet+' row '+metric.row});
@@ -471,7 +497,7 @@ const FolioEngine = (() => {
         const at=oldIndex.get(period.id),source=metric.values[period.id];
         const keepOld=at!==undefined&&!source;
         if(keepOld){nextIds.push(period.id);nextPeriods.push(arrayLiteral(oldPeriodTokens[at],oldPeriodTokens[0], 'period',period,sourceThai,language));nextData.push(oldDataTokens[at]??'null');}
-        else if(source){nextIds.push(period.id);nextPeriods.push(arrayLiteral(period.id,oldPeriodTokens[0],'period',period,sourceThai,language));nextData.push(String(Number(source.value.toPrecision?.(12)??source.value)));}
+        else if(source){nextIds.push(period.id);nextPeriods.push(arrayLiteral(period.id,oldPeriodTokens[0],'period',period,sourceThai,language));nextData.push(source.value===null?emptyArrayValue(source,oldDataTokens[at],oldDataTokens[0]):String(Number(source.value.toPrecision?.(12)??source.value)));}
         else if(at!==undefined){nextIds.push(period.id);nextPeriods.push(arrayLiteral(oldPeriodTokens[at],oldPeriodTokens[0],'period',period,sourceThai,language));nextData.push(oldDataTokens[at]??'null');report.unmatched.push(`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook · คงค่าเดิมไว้`);}
         else report.unmatched.push(`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook และกราฟเดิม`);
       }
@@ -483,7 +509,7 @@ const FolioEngine = (() => {
           if(!nextIds.includes(period.id))continue;
           const at=oldIndex.get(period.id),source=seriesMetric.values[period.id];
           if(at!==undefined&&!source)aligned.push(values[at]??'null');
-          else if(source)aligned.push(String(Number(source.value.toPrecision?.(12)??source.value)));
+          else if(source)aligned.push(source.value===null?emptyArrayValue(source,values[at],values[0]):String(Number(source.value.toPrecision?.(12)??source.value)));
           else aligned.push(at===undefined?'null':values[at]??'null');
         }
         patches.push({start:series.open+1,end:series.close,text:formatArrayItems(aligned,series.inner)});
