@@ -6,10 +6,15 @@ const FolioEngine = (() => {
   const periodFrom = value => {
     const text = String(value ?? '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;|&#160;/gi, ' ').replace(/\s+/g, ' ').trim();
     const q = text.match(/^(?:([1-4])\s*Q|Q\s*([1-4])|(?:Quarter|ไตรมาส)\s*([1-4]))\s*[/ .-]?\s*((?:19|20|25|26)\d{2}|\d{2})(?:\b|$)/i);
-    let year, quarter = 0;
+    const duration=text.match(/^(3|6|9)\s*M\s*[/ .-]?\s*((?:19|20|25|26)\d{2}|\d{2})(?:\b|$)/i);
+    const half=text.match(/^1\s*H\s*[/ .-]?\s*((?:19|20|25|26)\d{2}|\d{2})(?:\b|$)/i);
+    let year, quarter = 0, months=0, halfYear=false;
     if (q) {
       year = Number(q[4]); quarter = Number(q[1] || q[2] || q[3]);
       if (year < 100) year += year >= 50 ? 2500 : 2000;
+    } else if(duration||half){
+      year=Number(duration?.[2]||half?.[1]);months=duration?Number(duration[1]):6;halfYear=Boolean(half);
+      if(year<100)year+=year>=50?2500:2000;
     } else {
       const annual = text.match(/^(?:(?:FY|ปี)\s*)?((?:19|20|25|26)\d{2})(?:\s*[AE])?$/i);
       if (!annual) return null;
@@ -17,10 +22,13 @@ const FolioEngine = (() => {
     }
     if (year >= 2400) year -= 543;
     if (year < 1900 || year > 2199) return null;
-    return { id: String(year) + (quarter ? '-Q' + quarter : ''), year, quarter, label: quarter ? 'Q' + quarter + '/' + year : String(year) };
+    const id=String(year)+(quarter?'-Q'+quarter:halfYear?'-1H':months?'-'+months+'M':'');
+    return {id,year,quarter,months,halfYear,label:formatPeriodLabel({year,quarter,months,halfYear},'en')};
   };
-  const formatPeriodLabel = (period,language='en',buddhist=false) => period.quarter ? (language==='th'?'ไตรมาส ':'Q')+period.quarter+'/'+(period.year+(buddhist?543:0)) : String(period.year+(buddhist?543:0));
-  const uniquePeriods = list => [...new Map(list.filter(Boolean).map(p => [p.id, p])).values()].sort((a,b)=>a.year-b.year||a.quarter-b.quarter);
+  const formatPeriodLabel = (period,language='en',buddhist=false) => {const year=period.year+(buddhist?543:0);if(period.quarter)return (language==='th'?'ไตรมาส ':'Q')+period.quarter+'/'+year;if(period.halfYear)return '1H/'+year;if(period.months)return period.months+'M/'+year;return String(year);};
+  const isSubAnnual = period => Boolean(period&&(period.quarter||period.months||period.halfYear));
+  const periodOrder = period => period.quarter?period.quarter*3:period.months||(period.halfYear?6:13);
+  const uniquePeriods = list => [...new Map(list.filter(Boolean).map(p => [p.id, p])).values()].sort((a,b)=>a.year-b.year||periodOrder(a)-periodOrder(b)||String(a.id).localeCompare(String(b.id)));
   const normalize = value => plainText(value).toLowerCase().normalize('NFKC').replace(/&amp;/g,'&').replace(/[^\p{L}\p{N}]+/gu,'');
   const plainText = value => {
     const box=document.createElement('div'); box.innerHTML=String(value??'');
@@ -75,21 +83,23 @@ const FolioEngine = (() => {
       for(let ri=0;ri<all.length;ri++){
         const row=all[ri];
         const quarterOnly=row.cells.map(cell=>({cell,match:cell.text.match(/^(?:Q\s*([1-4])|([1-4])\s*Q|Quarter\s*([1-4])|ไตรมาส\s*([1-4]))$/i)})).filter(x=>x.match);
+        const durationOnly=row.cells.filter(cell=>/^(?:(?:3|6|9)\s*M|1\s*H)$/i.test(cell.text.trim()));
+        const partialPeriods=[...quarterOnly.map(x=>x.cell),...durationOnly];
         const direct=row.cells.map(cell=>({cell,period:periodFrom(cell.text)})).filter(x=>x.period);
-        const hasNumericBelow=col=>{for(let i=ri+1;i<Math.min(all.length,ri+31);i++){const next=all[i],nextPeriods=next.cells.filter(cell=>periodFrom(cell.text)),nextQuarters=next.cells.filter(cell=>/^(?:Q\s*[1-4]|[1-4]\s*Q|Quarter\s*[1-4]|ไตรมาส\s*[1-4])$/i.test(cell.text));if(nextPeriods.length>=2||nextQuarters.length>=2)break;const cell=next.cells.find(item=>item.col===col);if(cell&&(numberFrom(cell.raw)!==null||numberFrom(cell.text)!==null))return true;}return false;};
+        const hasNumericBelow=col=>{for(let i=ri+1;i<Math.min(all.length,ri+31);i++){const next=all[i],nextPeriods=next.cells.filter(cell=>periodFrom(cell.text)),nextPartial=next.cells.filter(cell=>/^(?:Q\s*[1-4]|[1-4]\s*Q|Quarter\s*[1-4]|ไตรมาส\s*[1-4]|(?:3|6|9)\s*M|1\s*H)$/i.test(cell.text));if(nextPeriods.length>=2||nextPartial.length>=2)break;const cell=next.cells.find(item=>item.col===col);if(cell&&(numberFrom(cell.raw)!==null||numberFrom(cell.text)!==null))return true;}return false;};
         const periodsByCol=[];
-        if(quarterOnly.length){
-          for(const item of quarterOnly){
-            let yearCell=direct.filter(x=>!x.period.quarter&&x.cell.col<=item.cell.col).sort((a,b)=>b.cell.col-a.cell.col)[0];
-            if(!yearCell){for(let previous=ri-1;previous>=Math.max(0,ri-3)&&!yearCell;previous--){const yearHeaders=all[previous].cells.map(cell=>({cell,period:periodFrom(cell.text)})).filter(x=>x.period&&!x.period.quarter&&x.cell.col<=item.cell.col);yearCell=yearHeaders.sort((a,b)=>b.cell.col-a.cell.col)[0];}}
-            if(!yearCell)continue;const q=Number(item.match[1]||item.match[2]||item.match[3]||item.match[4]);const period=periodFrom(`${q}Q/${yearCell.period.year}`);if(period&&hasNumericBelow(item.cell.col))periodsByCol.push({period,col:item.cell.col});
+        if(partialPeriods.length){
+          for(const item of partialPeriods){
+            let yearCell=direct.filter(x=>!isSubAnnual(x.period)&&x.cell.col<=item.col).sort((a,b)=>b.cell.col-a.cell.col)[0];
+            if(!yearCell){for(let previous=ri-1;previous>=Math.max(0,ri-3)&&!yearCell;previous--){const yearHeaders=all[previous].cells.map(cell=>({cell,period:periodFrom(cell.text)})).filter(x=>x.period&&!isSubAnnual(x.period)&&x.cell.col<=item.col);yearCell=yearHeaders.sort((a,b)=>b.cell.col-a.cell.col)[0];}}
+            if(!yearCell)continue;const period=periodFrom(`${item.text}/${yearCell.period.year}`);if(period&&hasNumericBelow(item.col))periodsByCol.push({period,col:item.col});
           }
         }
-        for(const item of direct){const groupingHeader=quarterOnly.some(q=>q.cell.col===item.cell.col);if((!quarterOnly.length||!groupingHeader)&&hasNumericBelow(item.cell.col))periodsByCol.push({period:item.period,col:item.cell.col});}
+        for(const item of direct){const groupingHeader=partialPeriods.some(partial=>partial.col===item.cell.col);if((!partialPeriods.length||!groupingHeader)&&hasNumericBelow(item.cell.col))periodsByCol.push({period:item.period,col:item.cell.col});}
         const candidates=[...new Map(periodsByCol.map(x=>[x.col+'|'+x.period.id,x])).values()];
         if(!candidates.length)continue;
         const uniqueHeaderPeriods=uniquePeriods(candidates.map(x=>x.period));
-        if(uniqueHeaderPeriods.length<2&&!candidates.some(x=>x.period.quarter)&&!(row.cells.length<=2&&row.cells.some(cell=>/^(?:year|period|ปี|งวด|FY)$/i.test(cell.text.trim()))))continue;
+        if(uniqueHeaderPeriods.length<2&&!candidates.some(x=>isSubAnnual(x.period))&&!(row.cells.length<=2&&row.cells.some(cell=>/^(?:year|period|ปี|งวด|FY)$/i.test(cell.text.trim()))))continue;
         sourcePeriods.push(...candidates.map(x=>x.period));
         const firstPeriodCol=Math.min(...candidates.map(x=>x.col));
         const sectionContext=all.slice(Math.max(0,ri-4),ri+1).map(item=>item.cells.map(cell=>cell.text).join(' ')).join(' ');
@@ -101,8 +111,8 @@ const FolioEngine = (() => {
         for(let rj=ri+1;rj<all.length;rj++){
           const data=all[rj];
           if(data.row>all[rj-1].row+20) break;
-          const nextPeriods=data.cells.filter(cell=>periodFrom(cell.text)),nextQuarters=data.cells.filter(cell=>/^(?:Q\s*[1-4]|[1-4]\s*Q|Quarter\s*[1-4]|ไตรมาส\s*[1-4])$/i.test(cell.text));
-          if(nextPeriods.length>=2||nextQuarters.length>=2)break;
+          const nextPeriods=data.cells.filter(cell=>periodFrom(cell.text)),nextPartial=data.cells.filter(cell=>/^(?:Q\s*[1-4]|[1-4]\s*Q|Quarter\s*[1-4]|ไตรมาส\s*[1-4]|(?:3|6|9)\s*M|1\s*H)$/i.test(cell.text));
+          if(nextPeriods.length>=2||nextPartial.length>=2)break;
           const before=data.cells.filter(cell=>cell.col<firstPeriodCol && cell.text.trim());
           if(!before.length) continue;
           // Workbooks may put English and Thai labels in adjacent columns.
@@ -280,15 +290,15 @@ const FolioEngine = (() => {
     let raw=row.raw;for(let i=row.cells.length-1;i>=0;i--){const c=row.cells[i];raw=raw.slice(0,c.start)+raw.slice(c.end);}const close=raw.lastIndexOf('</tr>');return close<0?row.raw:raw.slice(0,close)+newCells.join('')+raw.slice(close);
   }
   function updateFinancialTitle(html,selected,report){
-    const latest=[...selected].sort((a,b)=>a.year-b.year||a.quarter-b.quarter).at(-1);if(!latest)return html;
+    const latest=[...selected].sort((a,b)=>a.year-b.year||periodOrder(a)-periodOrder(b)||String(a.id).localeCompare(String(b.id))).at(-1);if(!latest)return html;
     return html.replace(/<(h[1-6])\b([^>]*)>([\s\S]*?)<\/\1>/gi,(whole,tag,attrs,inner)=>{
       const title=plainText(inner);if(!/(?:financial\s+highlights?|ข้อมูลสำคัญทางการเงิน|สรุปข้อมูลทางการเงิน)/i.test(title))return whole;
       const thai=/[\u0E00-\u0E7F]/.test(title),language=thai?'th':'en';
-      const quarterPattern=/(?:Q\s*[1-4]|[1-4]\s*Q|Quarter\s*[1-4]|ไตรมาส\s*[1-4])\s*[/. -]?\s*((?:19|20|25|26)\d{2})/gi;
-      const existingQuarter=[...title.matchAll(quarterPattern)].at(-1);
+      const periodPattern=/(?:Q\s*[1-4]|[1-4]\s*Q|Quarter\s*[1-4]|ไตรมาส\s*[1-4]|[369]\s*M|1\s*H)\s*[/. -]?\s*((?:19|20|25|26)\d{2})/gi;
+      const existingPeriod=[...title.matchAll(periodPattern)].at(-1);
       const existingYear=[...title.matchAll(/\b((?:19|20|25|26)\d{2})\b/g)].at(-1);
-      const oldToken=existingQuarter?.[0]||existingYear?.[1];if(!oldToken)return whole;
-      const oldYear=Number(existingQuarter?.[1]||existingYear[1]),label=formatPeriodLabel(latest,language,oldYear>=2400);
+      const oldToken=existingPeriod?.[0]||existingYear?.[1];if(!oldToken)return whole;
+      const oldYear=Number(existingPeriod?.[1]||existingYear[1]),label=formatPeriodLabel(latest,language,oldYear>=2400);
       if(oldToken===label)return whole;
       const offset=inner.lastIndexOf(oldToken);if(offset<0)return whole;
       const nextInner=inner.slice(0,offset)+label+inner.slice(offset+oldToken.length);
@@ -341,7 +351,7 @@ const FolioEngine = (() => {
   }
   function updateFinancialComponents(html,summary,selected,language,report){
     const tags=[...html.matchAll(/<counter-number\b[^>]*>/gi)];if(!tags.length)return html;
-    let output=html,changed=0;const latest=[...selected].sort((a,b)=>a.year-b.year||a.quarter-b.quarter).at(-1);
+    let output=html,changed=0;const latest=[...selected].sort((a,b)=>a.year-b.year||periodOrder(a)-periodOrder(b)||String(a.id).localeCompare(String(b.id))).at(-1);
     for(let i=tags.length-1;i>=0;i--){const tag=tags[i],start=tag.index;
       const before=output.slice(Math.max(0,start-500),start);
       const headings=[...before.matchAll(/<(?:h[1-6]|strong|label|p)\b[^>]*>([\s\S]*?)<\/(?:h[1-6]|strong|label|p)>/gi)];
@@ -414,7 +424,7 @@ const FolioEngine = (() => {
   function arrayLiteral(item,template,kind,period,sourceThai,language='en'){
     if(kind==='number')return String(item);
     const text=String(template??'');
-    if(period.quarter){const buddhist=/(?:25\d{2}|26\d{2})/.test(text)||(!text&&sourceThai);const year=period.year+(buddhist?543:0);return JSON.stringify(formatPeriodLabel({...period,year},language));}
+    if(isSubAnnual(period)){const buddhist=/(?:25\d{2}|26\d{2})/.test(text)||(!text&&sourceThai);const year=period.year+(buddhist?543:0);return JSON.stringify(formatPeriodLabel({...period,year},language));}
     const year=period.year+(/(?:25|26)\d{2}/.test(text)||(!text&&sourceThai)?543:0);return !text||/^\s*\d{4}\s*$/.test(text)?String(year):JSON.stringify(String(year));
   }
   function formatArrayItems(items,original){
@@ -430,8 +440,8 @@ const FolioEngine = (() => {
       const periodArray=arrayProperty(code,scope,'period',scopes),dataArray=arrayProperty(code,scope,'dataset',scopes);
       if(!periodArray||!dataArray)continue;
       const oldPeriodTokens=parseArray(periodArray.inner),oldPeriods=oldPeriodTokens.map(periodFrom);
-      const sectionKey=scopeKey(code,scope),quarterly=/(?:quarter|quarterly|qoq)/i.test(sectionKey),yearly=/(?:yearly|annual)/i.test(sectionKey);
-      if(!oldPeriods.some(Boolean)&&!quarterly&&!yearly)continue;
+      const sectionKey=scopeKey(code,scope),quarterly=/(?:quarter|quarterly|qoq)/i.test(sectionKey),yearly=/(?:yearly|annual)/i.test(sectionKey),periodicName=/(?:monthly|month|semiannual|halfyear|year.?to.?date|ytd)/i.test(sectionKey);
+      if(!oldPeriods.some(Boolean)&&!quarterly&&!yearly&&!periodicName)continue;
       const parentScopes=scopes.filter(x=>x.start<scope.start&&x.end>scope.end).sort((a,b)=>(a.end-a.start)-(b.end-b.start));
       const labels=[];
       for(const parent of [scope,...parentScopes]){
@@ -441,8 +451,8 @@ const FolioEngine = (() => {
       let metric=null;for(const label of labels){metric=findMetric(summary.metrics,label,'summary',selected);if(metric)break;}
       if(!metric){report.unmatched.push('ไม่พบแถวสรุปใน workbook ที่ตรงกับกราฟ '+(labels[0]||'ไม่มีชื่อ'));continue;}
       const oldDataTokens=parseArray(dataArray.inner),oldIndex=new Map();oldPeriods.forEach((period,index)=>{if(period)oldIndex.set(period.id,index);});
-      const isQuarterly=quarterly||oldPeriods.some(p=>p?.quarter);
-      const targetPeriods=selected.filter(p=>Boolean(p.quarter)===isQuarterly);
+      const isPeriodic=quarterly||periodicName||oldPeriods.some(isSubAnnual);
+      const targetPeriods=selected.filter(p=>isSubAnnual(p)===isPeriodic);
       const nextIds=[],nextPeriods=[],nextData=[];
       for(const period of targetPeriods){
         const at=oldIndex.get(period.id),source=metric.values[period.id];
@@ -471,7 +481,7 @@ const FolioEngine = (() => {
       }
       const chartScope=parentScopes.find(parent=>directBooleanProperty(code,parent,'QoQ',scopes)||directBooleanProperty(code,parent,'qoq',scopes));
       if(chartScope){for(const key of ['QoQ','qoq']){const body=code.slice(chartScope.start+1,chartScope.end-1),re=new RegExp('('+key+'\\s*:\\s*)(true|false)','i'),match=re.exec(body);if(match){const at=chartScope.start+1+match.index+match[1].length;if(!scopes.some(child=>child!==chartScope&&child.start>chartScope.start&&child.end<chartScope.end&&at>child.start&&at<child.end)){const id=chartScope.start+':'+at;if(!qoqPatches.has(id)){patches.push({start:at,end:at+match[2].length,text:nextData.some(v=>numberFrom(v)!==null)?'true':'false'});qoqPatches.add(id);}break;}}}}
-      changed++;report.changes.push({item:labels[0]||metric.label,oldValue:'chart '+(isQuarterly?'quarterly':'yearly')+' dataset',newValue:nextData.length+' points',source:metric.sheet+' row '+metric.row});
+      changed++;report.changes.push({item:labels[0]||metric.label,oldValue:'chart '+(isPeriodic?'periodic':'yearly')+' dataset',newValue:nextData.length+' points',source:metric.sheet+' row '+metric.row});
     }
     if(!changed&&code.trim()&&!report.unmatched.length)report.unmatched.push('ไม่พบ JavaScript chart source ที่มี period/dataset และชื่อ series เชื่อมกับแถวสรุปใน workbook');
     let output=code;for(const patch of patches.sort((a,b)=>b.start-a.start))output=output.slice(0,patch.start)+patch.text+output.slice(patch.end);
