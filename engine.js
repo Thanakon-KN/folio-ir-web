@@ -220,9 +220,9 @@ const FolioEngine = (() => {
     }
     return rows;
   }
-  const validateSelection=(selection,summary,order='asc')=>{
+  const validateSelection=(selection,summary)=>{
     if(!Array.isArray(selection)||!selection.length)throw new Error('เลือกงวดที่ต้องการแสดงอย่างน้อย 1 งวด');
-    const valid=new Set(summary.displayPeriods.map(p=>p.id));if(selection.some(id=>!valid.has(id))||new Set(selection).size!==selection.length)throw new Error('ตัวเลือกงวดไม่ตรงกับผลตรวจ กรุณาตรวจไฟล์ใหม่');const periods=summary.displayPeriods.filter(p=>selection.includes(p.id));return order==='desc'?periods.reverse():periods;
+    const byId=new Map(summary.displayPeriods.map(period=>[period.id,period]));if(selection.some(id=>!byId.has(id))||new Set(selection).size!==selection.length)throw new Error('ตัวเลือกงวดไม่ตรงกับผลตรวจ กรุณาตรวจไฟล์ใหม่');return selection.map(id=>byId.get(id));
   };
   const aliases={
     revenue:['sales','netsales','turnover','totalrevenue','totalrevenues','revenuefromoperations','revenuefromcontractswithcustomers','salesandserviceincome','รายได้','รายได้รวม','รายได้จากการขายและบริการ','รายได้จากการขายสินค้าและการให้บริการ'],
@@ -497,8 +497,8 @@ const FolioEngine = (() => {
     let output=code;for(const patch of patches.sort((a,b)=>b.start-a.start))output=output.slice(0,patch.start)+patch.text+output.slice(patch.end);
     return output;
   }
-  const updateFinancial=(payload,summary,selection,mode,language='en',order='asc')=>{
-    const periods=validateSelection(selection,summary,order);if(!['add','replace'].includes(mode))throw new Error('เลือกวิธีเพิ่มหรือแทนที่ข้อมูล');
+  const updateFinancial=(payload,summary,selection,mode,language='en')=>{
+    const periods=validateSelection(selection,summary);if(!['add','replace'].includes(mode))throw new Error('เลือกวิธีเพิ่มหรือแทนที่ข้อมูล');
     const report={changes:[],unmatched:[],notes:[]};
     const html=payload.html?updateFinancialHtml(payload.html,summary,periods,mode,language,report):'';
     const javascript=payload.javascript?updateFinancialJs(payload.javascript,summary,periods,mode,report,language):'';
