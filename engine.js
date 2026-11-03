@@ -505,16 +505,20 @@ const FolioEngine = (() => {
       const seriesCandidates=seriesProperties.map(series=>{const type=comparisonType(series.name),comparisonMetric=type?findComparisonMetric(summary.metrics,(metric?.label||labels[0]||comparisonBase(series.name)),type,'summary',selected):null,seriesMetric=findMetric(summary.metrics,type?comparisonBase(series.name):series.name,'summary',selected)||(type?metric:null);return {series,type,values:parseArray(series.inner),metric:seriesMetric,comparisonMetric};});
       if(!metric)metric=seriesCandidates.find(candidate=>candidate.metric)?.metric||null;
       if(!metric){report.unmatched.push('ไม่พบแถวสรุปใน workbook ที่ตรงกับกราฟ '+(labels[0]||'ไม่มีชื่อ'));continue;}
-      const scopeComparisonMetric=comparisonKind&&comparisonType(metric.label)!==comparisonKind?findMetric(summary.metrics,metric.label+' '+comparisonKind,'summary',selected):null;
+      const scopeComparisonMetric=comparisonKind&&comparisonType(metric.label)!==comparisonKind?findComparisonMetric(summary.metrics,metric.label,comparisonKind,'summary',selected):null;
       const matchedSeries=seriesCandidates.map(candidate=>{const type=candidate.type;return {...candidate,metric:candidate.metric||(type?metric:null),comparisonMetric:candidate.comparisonMetric||(type?findComparisonMetric(summary.metrics,metric.label,type,'summary',selected):null)}}).filter(({values,metric:seriesMetric})=>seriesMetric&&values.length===oldPeriodTokens.length&&values.every(value=>value===null||numberFrom(value)!==null||typeof value==='string'&&(!value.trim()||/^[-–—]$/.test(value))));
       const sourceFor=(sourceMetric,comparisonMetric,period,type='')=>{if(!sourceMetric)return null;if(!type)return sourceMetric.values[period.id]||null;return sourceMetric.comparisons?.[period.id+':'+type]||(comparisonType(sourceMetric.label)===type?sourceMetric.values[period.id]:null)||(comparisonMetric&&comparisonType(comparisonMetric.label)===type?comparisonMetric.values[period.id]:null)||(findComparisonMetric(summary.metrics,sourceMetric.label,type,'summary',selected)?.values[period.id]||null)||null;};
       const isPeriodic=quarterly||periodicName||oldPeriods.some(isSubAnnual);
-      const targetPeriods=selected.filter(p=>isSubAnnual(p)===isPeriodic);
+      const selectedTargetPeriods=selected.filter(p=>isSubAnnual(p)===isPeriodic);
+      // A chart may contain quarterly points while the user is updating annual
+      // table columns (or the reverse). In that case, still refresh the chart's
+      // existing points from matching workbook periods instead of skipping them.
+      const targetPeriods=selectedTargetPeriods.length?selectedTargetPeriods:uniquePeriods(oldPeriods.filter(Boolean));
       const nextIds=[],nextPeriods=[],nextData=[];
       for(const period of targetPeriods){
         const at=oldIndex.get(period.id),source=sourceFor(metric,scopeComparisonMetric,period,comparisonKind);
         const keepOld=at!==undefined&&!source;
-        if(keepOld){nextIds.push(period.id);nextPeriods.push(arrayLiteral(oldPeriodTokens[at],oldPeriodTokens[0], 'period',period,sourceThai,language));nextData.push(oldDataTokens[at]??'null');}
+        if(keepOld){nextIds.push(period.id);nextPeriods.push(arrayLiteral(oldPeriodTokens[at],oldPeriodTokens[0], 'period',period,sourceThai,language));nextData.push(oldDataTokens[at]??'null');report.unmatched.push(`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook · คงค่าเดิมใน JavaScript ไว้`);}
         else if(source){nextIds.push(period.id);nextPeriods.push(arrayLiteral(period.id,oldPeriodTokens[0],'period',period,sourceThai,language));nextData.push(source.value===null?emptyArrayValue(source,oldDataTokens[at],oldDataTokens[0]):String(Number(source.value.toPrecision?.(12)??source.value)));}
         else if(at!==undefined){nextIds.push(period.id);nextPeriods.push(arrayLiteral(oldPeriodTokens[at],oldPeriodTokens[0],'period',period,sourceThai,language));nextData.push(oldDataTokens[at]??'null');report.unmatched.push(`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook · คงค่าเดิมไว้`);}
         else report.unmatched.push(`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook และกราฟเดิม`);
