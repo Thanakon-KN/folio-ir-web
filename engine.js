@@ -276,7 +276,7 @@ const FolioEngine = (() => {
   function replaceRowCells(row,newCells){
     let raw=row.raw;for(let i=row.cells.length-1;i>=0;i--){const c=row.cells[i];raw=raw.slice(0,c.start)+raw.slice(c.end);}const close=raw.lastIndexOf('</tr>');return close<0?row.raw:raw.slice(0,close)+newCells.join('')+raw.slice(close);
   }
-  function updateFinancialHtml(html,summary,selected,mode,report){
+  function updateFinancialHtml(html,summary,selected,mode,language,report){
     const tables=[...html.matchAll(/<table\b[\s\S]*?<\/table>/gi)];let changed=false,matched=false;
     let updated=html.replace(/<table\b[\s\S]*?<\/table>/gi,table=>{
       const rows=scanRows(table);let headIndex=-1,periodCols=[];
@@ -284,13 +284,13 @@ const FolioEngine = (() => {
       if(headIndex<0||!periodCols.length)return table;
       if(periodCols.some(period=>period.span!==1)){report.unmatched.push('พบหัวงวดที่ใช้ colspan · คงตารางเดิมไว้เพื่อไม่ให้คอลัมน์เลื่อน');return table;}
       const tablePeriodStart=Math.min(...periodCols.map(p=>p.column)),tablePeriodEnd=Math.max(...periodCols.map(p=>p.column+p.span));
-      const unsafeRow=rows.find((row,index)=>index!==headIndex&&row.cells.some(cell=>cell.span>1&&cell.column<tablePeriodEnd&&cell.endColumn>tablePeriodStart)&&metricLabelCells(row,periodCols).some(cell=>findMetric(summary.metrics,cell.text,'detail',selected)));
+      const unsafeRow=rows.find((row,index)=>index!==headIndex&&row.cells.some(cell=>cell.span>1&&cell.column<tablePeriodEnd&&cell.endColumn>tablePeriodStart)&&targetLabelCells(row,periodCols,language).some(cell=>findMetric(summary.metrics,cell.text,'detail',selected)));
       if(unsafeRow){report.unmatched.push(`ตารางมี colspan ในแถว “${metricLabelCell(unsafeRow,periodCols)?.text||'ไม่ทราบชื่อ'}” · คงตารางเดิมไว้เพื่อไม่ให้ข้อมูลเหลื่อม`);return table;}
       const known=new Map(periodCols.map(x=>[x.period.id,x.column]));const wanted=selected.map(p=>p.id);const sourcePeriod=new Map(summary.displayPeriods.map(p=>[p.id,p]));
       let tableRows=rows.slice();
       for(let ri=0;ri<tableRows.length;ri++){
         const row=tableRows[ri];if(ri===headIndex)continue;
-        const labelCandidates=metricLabelCells(row,periodCols);if(!labelCandidates.length)continue;
+        const labelCandidates=targetLabelCells(row,periodCols,language);if(!labelCandidates.length)continue;
         let labelCell=labelCandidates[0],metric=null;for(const candidate of labelCandidates){metric=findMetric(summary.metrics,candidate.text,'detail',selected);if(metric){labelCell=candidate;break;}}
         if(!metric){const containsNumber=periodCols.some(period=>numberFrom(cellAtColumn(row,period.column)?.text)!==null);if(containsNumber)report.unmatched.push(`HTML “${labelCell.text}” มีค่าตัวเลขแต่จับคู่กับแถว workbook ไม่ได้ · คงแถวเดิมไว้`);continue;}
         matched=true;
@@ -307,24 +307,25 @@ const FolioEngine = (() => {
         if(newRaw!==row.raw){changed=true;tableRows[ri]={...row,raw:newRaw};report.changes.push({item:labelCell.text,oldValue:'ตารางเดิม',newValue:wanted.map(id=>sourcePeriod.get(id)?.label||id).join(', '),source:metric.sheet+' row '+metric.row});}
       }
       // Restrict rewriting to tables containing recognizable financial metric rows.
-      if(!tableRows.some((row,i)=>i!==headIndex&&metricLabelCells(row,periodCols).some(cell=>findMetric(summary.metrics,cell.text,'detail',selected))))return table;
+      if(!tableRows.some((row,i)=>i!==headIndex&&targetLabelCells(row,periodCols,language).some(cell=>findMetric(summary.metrics,cell.text,'detail',selected))))return table;
       const header=tableRows[headIndex],firstPeriod=Math.min(...periodCols.map(p=>p.column)),lastPeriod=Math.max(...periodCols.map(p=>p.column+p.span));const base=header.cells.filter(c=>c.endColumn<=firstPeriod).map(c=>c.raw),trailing=header.cells.filter(c=>c.column>=lastPeriod).map(c=>c.raw);const template=cellAtColumn(header,periodCols[0].column);const headCells=wanted.map(id=>{const found=known.get(id),cell=found===undefined?template:cellAtColumn(header,found);const label=sourcePeriod.get(id)?.label||id;return cell?replaceCellText(cell.raw,cell.text,label):`<th>${label}</th>`;});
       tableRows[headIndex]={...header,raw:replaceRowCells(header,[...base,...headCells,...trailing])};
       // Apply row-level column filtering/insertion only if the table header exposes period columns.
       return tableRows.map((row,i)=>({row,i})).sort((a,b)=>b.row.start-a.row.start).reduce((result,item)=>result.slice(0,item.row.start)+item.row.raw+result.slice(item.row.end),table);
     });
-    const beforeComponents=report.changes.length;updated=updateFinancialComponents(updated,summary,selected,report);const componentChanged=report.changes.length>beforeComponents;
+    const beforeComponents=report.changes.length;updated=updateFinancialComponents(updated,summary,selected,language,report);const componentChanged=report.changes.length>beforeComponents;
     if(!matched&&tables.length)report.unmatched.push('ไม่พบตาราง HTML ที่มีหัวงวดและชื่อรายการตรงกับแถวใน workbook');else if(matched&&!changed)report.notes.push('ตารางมีรายการตรงกับ workbook แต่ค่าที่เลือกไม่ทำให้โค้ดเปลี่ยนแปลง');
     if(tables.length===0&&!componentChanged)report.unmatched.push('ไม่พบ <table> หรือ counter-number ที่เชื่อมกับรายการใน workbook');
     return updated;
   }
-  function updateFinancialComponents(html,summary,selected,report){
+  function updateFinancialComponents(html,summary,selected,language,report){
     const tags=[...html.matchAll(/<counter-number\b[^>]*>/gi)];if(!tags.length)return html;
     let output=html,changed=0;const latest=[...selected].sort((a,b)=>a.year-b.year||a.quarter-b.quarter).at(-1);
     for(let i=tags.length-1;i>=0;i--){const tag=tags[i],start=tag.index;
       const before=output.slice(Math.max(0,start-500),start);
       const headings=[...before.matchAll(/<(?:h[1-6]|strong|label|p)\b[^>]*>([\s\S]*?)<\/(?:h[1-6]|strong|label|p)>/gi)];
       const context=headings.map(x=>plainText(x[1])).filter(Boolean).slice(-2).join(' ');
+      if(!matchesTargetLanguage(context,language))continue;
       let metric=findMetric(summary.metrics,context,'summary',selected)||findMetric(summary.metrics,context,'detail',selected);
       if(!metric||!latest||!metric.values[latest.id])continue;
       const source=metric.values[latest.id],old=tag[0].match(/(?:\:number|\bnumber)\s*=\s*(["'])(.*?)\1/i);
@@ -337,6 +338,14 @@ const FolioEngine = (() => {
     return output;
   }
   function metricLabelCells(row,periodCols){const first=Math.min(...periodCols.map(p=>p.column));return row.cells.filter(cell=>cell.endColumn<=first&&cell.text.trim()).reverse();}
+  function matchesTargetLanguage(text,language='both'){
+    if(language==='both')return true;
+    const value=plainText(text),hasThai=/[\u0E00-\u0E7F]/.test(value),hasLatin=/[A-Za-z]/.test(value);
+    if(hasThai&&hasLatin)return true;
+    if(!hasThai&&!hasLatin)return true;
+    return language==='th'?hasThai:hasLatin;
+  }
+  function targetLabelCells(row,periodCols,language){return metricLabelCells(row,periodCols).filter(cell=>matchesTargetLanguage(cell.text,language));}
   function metricLabelCell(row,periodCols){return metricLabelCells(row,periodCols)[0];}
   function parseArray(text){
     const parts=[];let start=0,quote='',escaped=false;
@@ -448,11 +457,12 @@ const FolioEngine = (() => {
     let output=code;for(const patch of patches.sort((a,b)=>b.start-a.start))output=output.slice(0,patch.start)+patch.text+output.slice(patch.end);
     return output;
   }
-  const updateFinancial=(payload,summary,selection,mode)=>{
+  const updateFinancial=(payload,summary,selection,mode,language='both')=>{
     const periods=validateSelection(selection,summary);if(!['add','replace'].includes(mode))throw new Error('เลือกวิธีเพิ่มหรือแทนที่ข้อมูล');
     const report={changes:[],unmatched:[],notes:[]};
-    const html=payload.html?updateFinancialHtml(payload.html,summary,periods,mode,report):'';
+    const html=payload.html?updateFinancialHtml(payload.html,summary,periods,mode,language,report):'';
     const javascript=payload.javascript?updateFinancialJs(payload.javascript,summary,periods,mode,report):'';
+    report.notes.push('ภาษา HTML ที่เลือก: '+({both:'ทั้งสองภาษา',en:'English',th:'ภาษาไทย'}[language]||'ทั้งสองภาษา'));
     if(mode==='add'&&!summary.sourcePeriods.some(p=>!summary.existingPeriods.some(o=>o.id===p.id)))report.notes.push('ไม่พบงวดใหม่ในไฟล์; โหมดเพิ่มจึงคงค่าของงวดซ้ำไว้');
     return {html,javascript,...report};
   };
