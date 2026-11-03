@@ -480,7 +480,15 @@ const FolioEngine = (() => {
   function arrayLiteral(item,template,kind,period,sourceThai,language='en'){
     if(kind==='number')return String(item);
     const text=String(template??'');
-    if(isSubAnnual(period)){const buddhist=/(?:25\d{2}|26\d{2})/.test(text)||(!text&&sourceThai);const year=period.year+(buddhist?543:0);let label=formatPeriodLabel({...period,year},language);if(/(?:Q|ไตรมาส|Quarter|\dQ)[^\d]*\d{2}\s*$/i.test(text))label=label.replace(/\d{4}$/,String(year).slice(-2));return quoteArrayString(label,text);}
+    if(isSubAnnual(period)){
+      const periodText=text.trim().replace(/^(['"])([\s\S]*)\1$/,'$2');
+      const oldPeriod=periodFrom(periodText),shortYear=periodText.match(/(?:Q\s*[1-4]|[1-4]\s*Q|(?:Quarter|ไตรมาส)\s*[1-4])\s*[/ .-]\s*(\d{2})\s*$/i)?.[1];
+      const shortYearIsBuddhist=Boolean(shortYear&&oldPeriod&&Number(shortYear)===(oldPeriod.year+543)%100&&Number(shortYear)!==oldPeriod.year%100);
+      const buddhist=/(?:25\d{2}|26\d{2})/.test(text)||shortYearIsBuddhist||(!text&&sourceThai);
+      const year=period.year+(buddhist?543:0);let label=formatPeriodLabel({...period,year},language);
+      if(shortYear)label=label.replace(/\d{4}$/,String(year).slice(-2));
+      return quoteArrayString(label,text);
+    }
     const year=period.year+(/(?:25|26)\d{2}/.test(text)||(!text&&sourceThai)?543:0);return !text||/^\s*\d{4}\s*$/.test(text)?String(year):quoteArrayString(String(year),text);
   }
   function quoteArrayString(value,template){const quote=String(template??'').trim().startsWith("'")?"'":'"';return quote+String(value).replace(/\\/g,'\\\\').replace(new RegExp(quote,'g'),'\\'+quote)+quote;}
