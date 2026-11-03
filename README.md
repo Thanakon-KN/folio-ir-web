@@ -4,7 +4,7 @@ Browser based version of the Folio IR workflow. It keeps the two workspaces, inp
 
 ## Run or publish
 
-Open `index.html` in a modern browser. To publish with GitHub Pages, place the contents of this folder at the repository root and select **Settings → Pages → Deploy from a branch**. The `vendor/xlsx.full.min.js` file is required for Excel workbook reading.
+Open `index.html` in a modern browser. To publish with GitHub Pages, place the contents of this folder at the repository root and select **Settings → Pages → Deploy from a branch**. The `xlsx.full.min.js` file is required for Excel workbook reading.
 
 ## Workflows
 
