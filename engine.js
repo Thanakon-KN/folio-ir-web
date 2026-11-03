@@ -237,7 +237,7 @@ const FolioEngine = (() => {
     profitbeforetax:['ebt','profitbeforeincometax','profitbeforetaxation','กำไรก่อนภาษี','กำไรก่อนภาษีเงินได้','กำไร(ขาดทุน)ก่อนภาษี'],
     sellingandadministrativeexpenses:['sga','sellingandadministrativeexpenses','ค่าใช้จ่ายในการขายและบริหาร','ค่าใช้จ่ายในการขายและการบริหาร'],
     totalassets:['assets','สินทรัพย์รวม'], totalliabilities:['liabilities','หนี้สินรวม'],
-    totalshareholdersequity:['shareholdersequity','equity','ส่วนของผู้ถือหุ้น','ส่วนของเจ้าของ'],
+    totalshareholdersequity:['totalshareholderequity','shareholdersequity','equity','ส่วนของผู้ถือหุ้น','ส่วนของเจ้าของ'],
     earningspershare:['eps','กำไรต่อหุ้น','กำไรสุทธิต่อหุ้น'],
     ebitda:['กำไรก่อนดอกเบี้ยภาษีค่าเสื่อมราคาและค่าตัดจำหน่าย'],
     cashflowfromoperatingactivities:['operatingcashflow','กระแสเงินสดจากกิจกรรมดำเนินงาน']
@@ -495,10 +495,58 @@ const FolioEngine = (() => {
     const sourceThai=/[\u0E00-\u0E7F]/.test(code);
     for(const scope of scopes){
       const periodArray=arrayProperty(code,scope,'period',scopes),dataArray=arrayProperty(code,scope,'dataset',scopes);
-      if(!periodArray||!dataArray)continue;
+      if(!periodArray)continue;
       const oldPeriodRaw=rawArrayItems(periodArray.inner),oldPeriodTokens=parseArray(periodArray.inner),oldPeriods=oldPeriodTokens.map(periodFrom);
       const sectionKey=scopeKey(code,scope),quarterly=/(?:quarter|quarterly|qoq)/i.test(sectionKey),yearly=/(?:yearly|annual)/i.test(sectionKey),periodicName=/(?:monthly|month|semiannual|halfyear|year.?to.?date|ytd)/i.test(sectionKey);
       if(!oldPeriods.some(Boolean)&&!quarterly&&!yearly&&!periodicName)continue;
+      // Some chart configs name each data series directly (for example
+      // totalAssets/totalLiabilities/totalShareholderEquity) instead of using
+      // a generic `dataset` key. Update those arrays against their own summary
+      // rows while keeping their original keys and layout intact.
+      if(!dataArray){
+        const namedSeries=directArrayProperties(code,scope,scopes).filter(series=>series.name!=='period'&&!/markPoint|axis|annotation|color|symbol|label/i.test(series.name));
+        if(!namedSeries.length)continue;
+        const isPeriodic=quarterly||periodicName||oldPeriods.some(isSubAnnual),selectedTargetPeriods=selected.filter(p=>isSubAnnual(p)===isPeriodic),requestedPeriods=selectedTargetPeriods.length?selectedTargetPeriods:uniquePeriods(oldPeriods.filter(Boolean));
+        const oldIndex=new Map();oldPeriods.forEach((period,index)=>{if(period)oldIndex.set(period.id,index);});
+        const seriesMetrics=namedSeries.map(series=>({series,metric:findMetric(summary.metrics,series.name,'summary',requestedPeriods)}));
+        const targetPeriods=requestedPeriods.filter(period=>oldIndex.has(period.id)||seriesMetrics.some(({metric})=>metric?.values[period.id]));
+        if(!targetPeriods.length)continue;
+        const updates=new Map();
+        for(const {series,metric} of seriesMetrics){
+          const values=parseArray(series.inner);
+          if(!metric)continue;
+          const aligned=[];
+          for(const period of targetPeriods){
+            const at=oldIndex.get(period.id),source=metric.values[period.id];
+            if(source){aligned.push(source.value===null?emptyArrayValue(source,values[at],values[0]):String(Number(source.value.toPrecision?.(12)??source.value)));}
+            else if(at!==undefined){aligned.push(values[at]??'null');report.unmatched.push(`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook · คงค่าเดิมใน JavaScript ไว้`);}
+            else{aligned.push('null');report.unmatched.push(`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook และกราฟเดิม`);}
+          }
+          updates.set(series.name,{series,metric,values:aligned});
+          patches.push({start:series.open+1,end:series.close,text:formatArrayItems(aligned,series.inner)});
+          report.changes.push({item:series.name,oldValue:values.join(', '),newValue:aligned.join(', '),source:metric.sheet+' row '+metric.row});
+        }
+        // `total` is the stacked sum used by this chart. If the workbook does
+        // not provide a separate total row, derive it from the three named
+        // components instead of leaving its existing empty array untouched.
+        const total= namedSeries.find(series=>series.name==='total'),totalUpdate=updates.get('total');
+        if(total&&!totalUpdate){
+          const components=['totalAssets','totalLiabilities','totalShareholderEquity'].map(name=>updates.get(name));
+          if(components.every(Boolean)){
+            const values=targetPeriods.map((period,index)=>{
+              const items=components.map(component=>numberFrom(component.values[index]));
+              return items.every(value=>value!==null)?String(Number(items.reduce((sum,value)=>sum+value,0).toPrecision(12))):'null';
+            });
+            patches.push({start:total.open+1,end:total.close,text:formatArrayItems(values,total.inner)});
+            report.changes.push({item:'total',oldValue:parseArray(total.inner).join(', '),newValue:values.join(', '),source:'คำนวณจาก totalAssets + totalLiabilities + totalShareholderEquity'});
+          }
+        }
+        if(updates.size){
+          patches.push({start:periodArray.open+1,end:periodArray.close,text:formatArrayItems(targetPeriods.map((period,index)=>{const at=oldIndex.get(period.id);return at!==undefined?oldPeriodRaw[at]:arrayLiteral(period.id,oldPeriodRaw[0],'period',period,sourceThai,language);}),periodArray.inner)});
+          changed+=updates.size;
+        }
+        continue;
+      }
       const parentScopes=scopes.filter(x=>x.start<scope.start&&x.end>scope.end).sort((a,b)=>(a.end-a.start)-(b.end-b.start));
       const labels=[];
       for(const parent of [scope,...parentScopes]){
@@ -533,6 +581,32 @@ const FolioEngine = (() => {
       const signature=scope.start+':'+dataArray.open;if(handled.has(signature))continue;handled.add(signature);
       patches.push({start:periodArray.open+1,end:periodArray.close,text:formatArrayItems(nextPeriods,periodArray.inner)});
       patches.push({start:dataArray.open+1,end:dataArray.close,text:formatArrayItems(nextData,dataArray.inner)});
+      // Growth labels in markPointData are derived from the plotted values.
+      // Refresh their percentage when the chart contains a matching prior-year
+      // point, keeping the original label, quote style, and decimal precision.
+      const markPoints=arrayProperty(code,scope,'markPointData',scopes);
+      if(markPoints){
+        const values=nextData.map(numberFrom),latest=targetPeriods.reduce((best,period)=>!best||period.year>best.year||period.year===best.year&&periodOrder(period)>periodOrder(best)?period:best,null);
+        const latestIndex=targetPeriods.findIndex(period=>period.id===latest?.id);
+        const priorIndex=latest?targetPeriods.findIndex(period=>period.year===latest.year-1&&period.quarter===latest.quarter&&period.months===latest.months&&period.halfYear===latest.halfYear):-1;
+        if(priorIndex>=0&&values[latestIndex]!==null&&values[priorIndex]!==null&&values[priorIndex]!==0){
+          const growth=(values[latestIndex]/values[priorIndex]-1)*100;
+          for(const marker of scopes.filter(item=>item.start>markPoints.open&&item.end<=markPoints.close)){
+            if(!/^growth\s*y\s*o\s*y$/i.test(directTextProperty(code,marker,'name',scopes)))continue;
+            const body=code.slice(marker.start+1,marker.end-1),match=/(\bvalue\s*:\s*)(['"])([^'"]*)(\2)/i.exec(body);
+            if(!match)continue;
+            const oldNumber=match[3].match(/-?\d+(?:,\d{3})*(?:\.\d+)?/),places=oldNumber?decimalPlaces(oldNumber[0]):1;
+            const formatted=growth.toLocaleString('en-US',{minimumFractionDigits:places,maximumFractionDigits:places});
+            const replacement=match[3].replace(/-?\d+(?:,\d{3})*(?:\.\d+)?/,formatted);
+            const valueStart=marker.start+1+match.index+match[1].length+1;
+            patches.push({start:valueStart,end:valueStart+match[3].length,text:replacement});
+            for(const [key,value] of [['xAxis',latestIndex],['yAxis',values[latestIndex]]]){
+              const coordinate=new RegExp('('+key+'\\s*:\\s*)(-?\\d+(?:\\.\\d+)?)').exec(body);
+              if(coordinate){const start=marker.start+1+coordinate.index+coordinate[1].length;patches.push({start,end:start+coordinate[2].length,text:String(value)});}
+            }
+          }
+        }
+      }
       for(const {series,type,values,metric:seriesMetric,comparisonMetric} of matchedSeries){
         const aligned=[];for(const period of targetPeriods){
           if(!nextIds.includes(period.id))continue;
