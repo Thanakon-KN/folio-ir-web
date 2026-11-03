@@ -1,5 +1,6 @@
 'use strict';
 const htmlPreviewState = { source: 'original', width: 'desktop', lastHtml: null, timer: null };
+const jsPreviewState = { source: 'original', timer: null };
 const previewBaseStyle = `
   *{box-sizing:border-box}html{color-scheme:light}body{margin:0;padding:28px;background:#fff;color:#24364b;font:14px/1.65 "Segoe UI",Tahoma,sans-serif;overflow-wrap:anywhere}
   h1,h2,h3,h4{color:#14283f;line-height:1.4;margin:0 0 16px}h1{font-size:28px}h2{font-size:24px}h3{font-size:19px}p{margin:0 0 16px}
@@ -98,3 +99,24 @@ document.querySelector('#refresh-preview').addEventListener('click', () => rende
 document.querySelector('.preview-card').addEventListener('toggle', event => {
   if (event.currentTarget.open) queueHtmlPreview(true);
 });
+function queueJsDataPreview(){clearTimeout(jsPreviewState.timer);jsPreviewState.timer=setTimeout(renderJsDataPreview,120);}
+function renderJsDataPreview(){
+  const original=document.querySelector('#javascript-code').value,result=document.querySelector('#javascript-result').value,available=Boolean(result.trim());
+  if(!available&&jsPreviewState.source==='result')jsPreviewState.source='original';
+  document.querySelectorAll('[data-js-preview-source]').forEach(button=>{button.setAttribute('aria-pressed',String(button.dataset.jsPreviewSource===jsPreviewState.source));if(button.dataset.jsPreviewSource==='result')button.disabled=!available;});
+  const code=jsPreviewState.source==='result'?result:original,content=document.querySelector('#js-preview-content'),count=document.querySelector('#js-preview-count');
+  content.replaceChildren();
+  const charts=window.FolioEngine?.parseChartPreview(code)||[];
+  count.textContent=charts.length?`${charts.length} ชุดข้อมูล`:'ไม่มีชุดข้อมูลที่รู้จัก';
+  if(!charts.length){const empty=document.createElement('div');empty.className='preview-empty js-preview-empty';const title=document.createElement('strong'),detail=document.createElement('p');title.textContent=code.trim()?'ไม่พบ array period/dataset ที่รองรับ':'วาง JavaScript เพื่อดูข้อมูลกราฟ';detail.textContent=code.trim()?'ต้องมี array period และ dataset ใน object เดียวกัน':'ตัวอย่างจะแสดงค่า period และ dataset จากโค้ดที่พบ';empty.append(title,detail);content.append(empty);return;}
+  charts.forEach(chart=>{
+    const section=document.createElement('section');section.className='js-chart-preview';const heading=document.createElement('div');heading.className='js-chart-preview-heading';const title=document.createElement('strong'),meta=document.createElement('span');title.textContent=chart.title;meta.textContent=`${chart.key} · ${chart.section}`;heading.append(title,meta);
+    const table=document.createElement('table');table.className='js-data-preview-table';const thead=document.createElement('thead'),headRow=document.createElement('tr');for(const label of ['Period','Dataset']){const th=document.createElement('th');th.textContent=label;headRow.append(th);}thead.append(headRow);const tbody=document.createElement('tbody');
+    chart.rows.forEach(row=>{const tr=document.createElement('tr'),period=document.createElement('td'),value=document.createElement('td');period.textContent=row.period;value.textContent=row.value;value.className='js-data-value';tr.append(period,value);tbody.append(tr);});table.append(thead,tbody);section.append(heading,table);content.append(section);
+  });
+}
+document.querySelectorAll('[data-js-preview-source]').forEach(button=>button.addEventListener('click',()=>{jsPreviewState.source=button.dataset.jsPreviewSource;renderJsDataPreview();}));
+document.querySelector('.js-preview-card').addEventListener('toggle',event=>{if(event.currentTarget.open)queueJsDataPreview();});
+document.querySelector('#javascript-code').addEventListener('input',queueJsDataPreview);
+document.querySelector('#refresh-preview').addEventListener('click',queueJsDataPreview);
+queueJsDataPreview();

@@ -357,11 +357,11 @@ const FolioEngine = (() => {
   }
   function updateFinancialHtml(html,summary,selected,mode,language,report){
     const tables=[...html.matchAll(/<table\b[\s\S]*?<\/table>/gi)];let changed=false,matched=false;
-    let updated=html.replace(/<table\b[\s\S]*?<\/table>/gi,table=>{
+    let updated=html.replace(/<table\b[\s\S]*?<\/table>/gi,(table,tableStart)=>{
       const rows=scanRows(table);let headIndex=-1,periodCols=[];
       rows.forEach((row,index)=>{const ps=row.cells.map(c=>({period:periodFrom(c.text),column:c.column,span:c.span})).filter(x=>x.period);if(ps.length>periodCols.length&&ps.length>=1){periodCols=ps;headIndex=index;}});
       if(headIndex<0||!periodCols.length)return table;
-      if(periodCols.some(period=>period.span!==1)){report.unmatched.push('พบหัวงวดที่ใช้ colspan · คงตารางเดิมไว้เพื่อไม่ให้คอลัมน์เลื่อน');return table;}
+      if(periodCols.some(period=>period.span!==1)){const message='พบหัวงวดที่ใช้ colspan · คงตารางเดิมไว้เพื่อไม่ให้คอลัมน์เลื่อน';report.unmatched.push(message);addCodeIssue(report,'html',html,tableStart,tableStart+table.length,message);return table;}
       const comparisonCols=rows[headIndex].cells.map(cell=>({cell,type:comparisonType(cell.text)})).filter(item=>item.type&&!periodFrom(item.cell.text)).map(item=>{const owner=periodCols.filter(period=>period.column<=item.cell.column).sort((a,b)=>b.column-a.column)[0]||[...periodCols].sort((a,b)=>Math.abs(a.column-item.cell.column)-Math.abs(b.column-item.cell.column))[0];return owner?{type:item.type,column:item.cell.column,period:owner.period}:null;}).filter(Boolean);
       // Keep every comparison column found in the original table. If its original
       // period is not selected, attach it to the latest selected period of the
@@ -372,19 +372,19 @@ const FolioEngine = (() => {
       const dataColumns=[...periodCols.map(item=>({column:item.column,span:item.span})),...comparisonCols.map(item=>({column:item.column,span:1}))];
       const tablePeriodStart=Math.min(...dataColumns.map(p=>p.column)),tablePeriodEnd=Math.max(...dataColumns.map(p=>p.column+p.span));
       const unsafeRow=rows.find((row,index)=>index!==headIndex&&row.cells.some(cell=>cell.span>1&&cell.column<tablePeriodEnd&&cell.endColumn>tablePeriodStart)&&targetLabelCells(row,periodCols,language).some(cell=>findMetric(summary.metrics,cell.text,'detail',selected)));
-      if(unsafeRow){report.unmatched.push(`ตารางมี colspan ในแถว “${metricLabelCell(unsafeRow,periodCols)?.text||'ไม่ทราบชื่อ'}” · คงตารางเดิมไว้เพื่อไม่ให้ข้อมูลเหลื่อม`);return table;}
+      if(unsafeRow){const message=`ตารางมี colspan ในแถว “${metricLabelCell(unsafeRow,periodCols)?.text||'ไม่ทราบชื่อ'}” · คงตารางเดิมไว้เพื่อไม่ให้ข้อมูลเหลื่อม`;report.unmatched.push(message);addCodeIssue(report,'html',html,tableStart,tableStart+table.length,message);return table;}
       const known=new Map(periodCols.map(x=>[x.period.id,x.column]));const wanted=selected.map(p=>p.id);const sourcePeriod=new Map(summary.displayPeriods.map(p=>[p.id,p]));
       let tableRows=rows.slice();
       for(let ri=0;ri<tableRows.length;ri++){
         const row=tableRows[ri];if(ri===headIndex)continue;
         const labelCandidates=targetLabelCells(row,periodCols,language);if(!labelCandidates.length)continue;
         let labelCell=labelCandidates[0],metric=null;for(const candidate of labelCandidates){metric=findMetric(summary.metrics,candidate.text,'detail',selected);if(metric){labelCell=candidate;break;}}
-        if(!metric){const containsNumber=periodCols.some(period=>numberFrom(cellAtColumn(row,period.column)?.text)!==null);if(containsNumber)report.unmatched.push(`HTML “${labelCell.text}” มีค่าตัวเลขแต่จับคู่กับแถว workbook ไม่ได้ · คงแถวเดิมไว้`);continue;}
+        if(!metric){const containsNumber=periodCols.some(period=>numberFrom(cellAtColumn(row,period.column)?.text)!==null);if(containsNumber){const message=`HTML “${labelCell.text}” มีค่าตัวเลขแต่จับคู่กับแถว workbook ไม่ได้ · คงแถวเดิมไว้`;report.unmatched.push(message);addCodeIssue(report,'html',html,tableStart,tableStart+table.length,message);}continue;}
         matched=true;
         const startCol=tablePeriodStart,endCol=tablePeriodEnd;
         const baseCells=row.cells.filter(c=>c.endColumn<=startCol).map(c=>c.raw),trailingCells=row.cells.filter(c=>c.column>=endCol).map(c=>c.raw),valueCells=[],periodTemplate=cellAtColumn(row,periodCols[0].column),comparisonTemplate=comparisonCols.length?cellAtColumn(row,comparisonCols[0].column):null;
         for(const id of wanted){const oldIndex=known.get(id),old=oldIndex===undefined?null:cellAtColumn(row,oldIndex),source=metric.values[id];valueCells.push(financialValueCell(old,periodTemplate,source,metric.label));
-          if(!source&&oldIndex===undefined)report.unmatched.push(`HTML “${labelCell.text}” ไม่มีค่า ${formatPeriodLabel(sourcePeriod.get(id)||{year:Number(id.slice(0,4)),quarter:Number(id.match(/-Q([1-4])/)?.[1]||0)},language)} จาก workbook`);
+          if(!source&&oldIndex===undefined){const message=`HTML “${labelCell.text}” ไม่มีค่า ${formatPeriodLabel(sourcePeriod.get(id)||{year:Number(id.slice(0,4)),quarter:Number(id.match(/-Q([1-4])/)?.[1]||0)},language)} จาก workbook`;report.unmatched.push(message);addCodeIssue(report,'html',html,tableStart,tableStart+table.length,message);}
           for(const comparison of comparisonTypesByPeriod.get(id)||[]){const type=comparison.type,compareColumn=comparison.column,oldCompare=cellAtColumn(row,compareColumn),comparisonMetric=findComparisonMetric(summary.metrics,metric.label,type,'detail',selected),sourceCompare=metric.comparisons?.[id+':'+type]||comparisonMetric?.values[id]||null;valueCells.push(financialValueCell(oldCompare,oldCompare||comparisonTemplate||periodTemplate,sourceCompare,metric.label+' '+type));if(sourceCompare&&sourceCompare.value!==null)matched=true;}
         }
         const newRaw=replaceRowCells(row,[...baseCells,...valueCells,...trailingCells]);
@@ -399,8 +399,8 @@ const FolioEngine = (() => {
     });
     const beforeComponents=report.changes.length;updated=updateFinancialComponents(updated,summary,selected,language,report);const componentChanged=report.changes.length>beforeComponents;
     const beforeTitle=report.changes.length;updated=updateFinancialTitle(updated,selected,report);const titleChanged=report.changes.length>beforeTitle;
-    if(!matched&&tables.length&&!titleChanged)report.unmatched.push('ไม่พบตาราง HTML ที่มีหัวงวดและชื่อรายการตรงกับแถวใน workbook');else if(matched&&!changed)report.notes.push('ตารางมีรายการตรงกับ workbook แต่ค่าที่เลือกไม่ทำให้โค้ดเปลี่ยนแปลง');
-    if(tables.length===0&&!componentChanged&&!titleChanged)report.unmatched.push('ไม่พบ <table> หรือ counter-number ที่เชื่อมกับรายการใน workbook');
+    if(!matched&&tables.length&&!titleChanged){const message='ไม่พบตาราง HTML ที่มีหัวงวดและชื่อรายการตรงกับแถวใน workbook';report.unmatched.push(message);addCodeIssue(report,'html',html,0,html.length,message);}else if(matched&&!changed)report.notes.push('ตารางมีรายการตรงกับ workbook แต่ค่าที่เลือกไม่ทำให้โค้ดเปลี่ยนแปลง');
+    if(tables.length===0&&!componentChanged&&!titleChanged){const message='ไม่พบ <table> หรือ counter-number ที่เชื่อมกับรายการใน workbook';report.unmatched.push(message);addCodeIssue(report,'html',html,0,html.length,message);}
     return updated;
   }
   function updateFinancialComponents(html,summary,selected,language,report){
@@ -470,6 +470,29 @@ const FolioEngine = (() => {
     const body=code.slice(scope.start+1,scope.end-1),re=new RegExp("[\"']?\\b"+name+"\\b[\"']?\\s*:\\s*([\"'])(.*?)\\1",'gi');let match;
     while((match=re.exec(body))){const at=scope.start+1+match.index;if(scopes.some(child=>child!==scope&&child.start>scope.start&&child.end<scope.end&&at>child.start&&at<child.end))continue;return match[2];}
     return '';
+  }
+  function parseChartPreview(code){
+    const scopes=scanObjectScopes(code),charts=[];
+    for(const scope of scopes){
+      const periods=arrayProperty(code,scope,'period',scopes),dataset=arrayProperty(code,scope,'dataset',scopes);
+      if(!periods||!dataset)continue;
+      const parentScopes=scopes.filter(item=>item.start<scope.start&&item.end>scope.end).sort((a,b)=>(a.end-a.start)-(b.end-b.start));
+      let title='';
+      for(const parent of [...parentScopes].reverse()){
+        const legend=arrayProperty(code,parent,'legend',scopes);
+        if(legend){const labels=parseArray(legend.inner).filter(value=>typeof value==='string'&&value.trim());if(labels.length){title=labels.join(' / ');break;}}
+      }
+      const parent=parentScopes.at(-1),key=scopeKey(code,scope),chartKey=parentScopes.map(item=>scopeKey(code,item)).filter(Boolean).at(-1)||scopeKey(code,parent||scope);
+      const rawPeriods=rawArrayItems(periods.inner),rawValues=rawArrayItems(dataset.inner),periodValues=parseArray(periods.inner);
+      const rows=rawPeriods.map((token,index)=>({period:String(periodValues[index]??token.replace(/^['"]|['"]$/g,'')),value:rawValues[index]??''}));
+      charts.push({key:chartKey||'Chart',section:key||'data',title:title||chartKey||key||'Chart data',rows,start:scope.start,end:scope.end});
+    }
+    return charts.sort((a,b)=>a.start-b.start);
+  }
+  function addCodeIssue(report,language,code,start,end,message){
+    report.codeIssues ||= [];
+    const boundedStart=Math.max(0,Math.min(code.length,start)),boundedEnd=Math.max(boundedStart,Math.min(code.length,end));
+    report.codeIssues.push({language,start:boundedStart,end:boundedEnd,line:code.slice(0,boundedStart).split('\n').length,message});
   }
   function directBooleanProperty(code,scope,name,scopes){
     const body=code.slice(scope.start+1,scope.end-1),re=new RegExp("[\"']?\\b"+name+"\\b[\"']?\\s*:\\s*(?:true|false)",'gi');let match;
@@ -541,13 +564,13 @@ const FolioEngine = (() => {
         const updates=new Map();
         for(const {series,metric} of seriesMetrics){
           const values=parseArray(series.inner);
-          if(!metric)continue;
+          if(!metric){const message=`ไม่พบแถว workbook ที่ตรงกับ JavaScript series “${series.name}”`;report.unmatched.push(message);addCodeIssue(report,'javascript',code,series.open,series.close+1,message);continue;}
           const aligned=[];
           for(const period of targetPeriods){
             const at=oldIndex.get(period.id),source=metric.values[period.id];
             if(source){aligned.push(source.value===null?emptyArrayValue(source,values[at],values[0]):financialArrayNumber(source.value,values[at]));}
-            else if(at!==undefined){aligned.push(values[at]??'null');report.unmatched.push(`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook · คงค่าเดิมใน JavaScript ไว้`);}
-            else{aligned.push('null');report.unmatched.push(`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook และกราฟเดิม`);}
+            else if(at!==undefined){const message=`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook · คงค่าเดิมใน JavaScript ไว้`;aligned.push(values[at]??'null');report.unmatched.push(message);addCodeIssue(report,'javascript',code,series.open,series.close+1,message);}
+            else{const message=`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook และกราฟเดิม`;aligned.push('null');report.unmatched.push(message);addCodeIssue(report,'javascript',code,series.open,series.close+1,message);}
           }
           updates.set(series.name,{series,metric,values:aligned});
           const updated=updateArrayItems(aligned,series.inner);
@@ -588,7 +611,7 @@ const FolioEngine = (() => {
       const seriesProperties=directArrayProperties(code,scope,scopes).filter(series=>series.name!=='period'&&series.name!=='dataset'&&!/markPoint|axis|annotation|color|symbol|label/i.test(series.name));
       const seriesCandidates=seriesProperties.map(series=>{const type=comparisonType(series.name),comparisonMetric=type?findComparisonMetric(summary.metrics,(metric?.label||labels[0]||comparisonBase(series.name)),type,'summary',selected):null,seriesMetric=findMetric(summary.metrics,type?comparisonBase(series.name):series.name,'summary',selected)||(type?metric:null);return {series,type,values:parseArray(series.inner),rawValues:rawArrayItems(series.inner),metric:seriesMetric,comparisonMetric};});
       if(!metric)metric=seriesCandidates.find(candidate=>candidate.metric)?.metric||null;
-      if(!metric){report.unmatched.push('ไม่พบแถวสรุปใน workbook ที่ตรงกับกราฟ '+(labels[0]||'ไม่มีชื่อ'));continue;}
+      if(!metric){const message='ไม่พบแถวสรุปใน workbook ที่ตรงกับกราฟ '+(labels[0]||'ไม่มีชื่อ');report.unmatched.push(message);addCodeIssue(report,'javascript',code,scope.start,scope.end,message);continue;}
       const scopeComparisonMetric=comparisonKind&&comparisonType(metric.label)!==comparisonKind?findComparisonMetric(summary.metrics,metric.label,comparisonKind,'summary',selected):null;
       const matchedSeries=seriesCandidates.map(candidate=>{const type=candidate.type;return {...candidate,metric:candidate.metric||(type?metric:null),comparisonMetric:candidate.comparisonMetric||(type?findComparisonMetric(summary.metrics,metric.label,type,'summary',selected):null)}}).filter(({values,metric:seriesMetric})=>seriesMetric&&values.length===oldPeriodTokens.length&&values.every(value=>value===null||numberFrom(value)!==null||typeof value==='string'&&(!value.trim()||/^[-–—]$/.test(value))));
       const sourceFor=(sourceMetric,comparisonMetric,period,type='')=>{if(!sourceMetric)return null;if(!type)return sourceMetric.values[period.id]||null;return sourceMetric.comparisons?.[period.id+':'+type]||(comparisonType(sourceMetric.label)===type?sourceMetric.values[period.id]:null)||(comparisonMetric&&comparisonType(comparisonMetric.label)===type?comparisonMetric.values[period.id]:null)||(findComparisonMetric(summary.metrics,sourceMetric.label,type,'summary',selected)?.values[period.id]||null)||null;};
@@ -603,10 +626,10 @@ const FolioEngine = (() => {
       for(const period of targetPeriods){
         const at=oldIndex.get(period.id),source=sourceFor(metric,scopeComparisonMetric,period,comparisonKind);
         const keepOld=at!==undefined&&!source;
-        if(keepOld){nextIds.push(period.id);nextPeriods.push(oldPeriodRaw[at]||arrayLiteral(oldPeriodTokens[at],oldPeriodRaw[0]||shortPeriodTemplate, 'period',period,sourceThai,language));nextData.push(oldDataRaw[at]??'null');report.unmatched.push(`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook · คงค่าเดิมใน JavaScript ไว้`);}
+        if(keepOld){const message=`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook · คงค่าเดิมใน JavaScript ไว้`;nextIds.push(period.id);nextPeriods.push(oldPeriodRaw[at]||arrayLiteral(oldPeriodTokens[at],oldPeriodRaw[0]||shortPeriodTemplate, 'period',period,sourceThai,language));nextData.push(oldDataRaw[at]??'null');report.unmatched.push(message);addCodeIssue(report,'javascript',code,dataArray.open,dataArray.close+1,message);}
         else if(source){nextIds.push(period.id);nextPeriods.push(at!==undefined?oldPeriodRaw[at]:arrayLiteral(period.id,oldPeriodRaw[0]||shortPeriodTemplate,'period',period,sourceThai,language));nextData.push(source.value===null?emptyArrayValue(source,oldDataRaw[at],oldDataRaw[0]):financialArrayNumber(source.value,oldDataRaw[at]));}
-        else if(at!==undefined){nextIds.push(period.id);nextPeriods.push(oldPeriodRaw[at]||arrayLiteral(oldPeriodTokens[at],oldPeriodRaw[0]||shortPeriodTemplate,'period',period,sourceThai,language));nextData.push(oldDataRaw[at]??'null');report.unmatched.push(`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook · คงค่าเดิมไว้`);}
-        else report.unmatched.push(`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook และกราฟเดิม`);
+        else if(at!==undefined){const message=`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook · คงค่าเดิมไว้`;nextIds.push(period.id);nextPeriods.push(oldPeriodRaw[at]||arrayLiteral(oldPeriodTokens[at],oldPeriodRaw[0]||shortPeriodTemplate,'period',period,sourceThai,language));nextData.push(oldDataRaw[at]??'null');report.unmatched.push(message);addCodeIssue(report,'javascript',code,dataArray.open,dataArray.close+1,message);}
+        else{const message=`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook และกราฟเดิม`;report.unmatched.push(message);addCodeIssue(report,'javascript',code,scope.start,scope.end,message);}
       }
       const signature=scope.start+':'+dataArray.open;if(handled.has(signature))continue;handled.add(signature);
       const updatedPeriods=updateArrayItems(nextPeriods,periodArray.inner),updatedData=updateArrayItems(nextData,dataArray.inner),chartValuesChanged=updatedPeriods!==periodArray.inner||updatedData!==dataArray.inner;
@@ -653,13 +676,13 @@ const FolioEngine = (() => {
       const chartScope=parentScopes.find(parent=>directBooleanProperty(code,parent,'QoQ',scopes)||directBooleanProperty(code,parent,'qoq',scopes));
       if(chartScope&&(!comparisonKind||comparisonKind==='qoq')){for(const key of ['QoQ','qoq']){const body=code.slice(chartScope.start+1,chartScope.end-1),re=new RegExp('('+key+'\\s*:\\s*)(true|false)','i'),match=re.exec(body);if(match){const at=chartScope.start+1+match.index+match[1].length;if(!scopes.some(child=>child!==chartScope&&child.start>chartScope.start&&child.end<chartScope.end&&at>child.start&&at<child.end)){const id=chartScope.start+':'+at;if(!qoqPatches.has(id)){patches.push({start:at,end:at+match[2].length,text:nextData.some(v=>numberFrom(v)!==null)?'true':'false'});qoqPatches.add(id);}break;}}}}
     }
-    if(!changed&&code.trim()&&!report.unmatched.length)report.unmatched.push('ไม่พบ JavaScript chart source ที่มี period/dataset และชื่อ series เชื่อมกับแถวสรุปใน workbook');
+    if(!changed&&code.trim()&&!report.codeIssues?.some(issue=>issue.language==='javascript')){const message='ไม่พบ JavaScript chart source ที่มี period/dataset และชื่อ series เชื่อมกับแถวสรุปใน workbook';report.unmatched.push(message);addCodeIssue(report,'javascript',code,0,code.length,message);}
     let output=code;for(const patch of patches.sort((a,b)=>b.start-a.start))output=output.slice(0,patch.start)+patch.text+output.slice(patch.end);
     return output;
   }
   const updateFinancial=(payload,summary,selection,mode,language='en')=>{
     const periods=validateSelection(selection,summary);if(!['add','replace'].includes(mode))throw new Error('เลือกวิธีเพิ่มหรือแทนที่ข้อมูล');
-    const report={changes:[],unmatched:[],notes:[]};
+    const report={changes:[],unmatched:[],notes:[],codeIssues:[]};
     const html=payload.html?updateFinancialHtml(payload.html,summary,periods,mode,language,report):'';
     const javascript=payload.javascript?updateFinancialJs(payload.javascript,summary,periods,mode,report,language):'';
     report.notes.push('ภาษา HTML ที่เลือก: '+({en:'English',th:'ภาษาไทย'}[language]||'English'));
@@ -753,6 +776,6 @@ const FolioEngine = (() => {
     const {target}=unique[0],raw=html.slice(target.start,target.end),old=plainText(inner(target)),replacement=replaceCellText(raw,old,value);
     return {html:html.slice(0,target.start)+replacement+html.slice(target.end),count:1};
   }
-  return {parseWorkbook,inspect,periodFrom,extractExistingPeriods,extractFinancial,updateFinancial,updateShareholders,plainText,numberFrom,uniquePeriods};
+  return {parseWorkbook,inspect,periodFrom,extractExistingPeriods,extractFinancial,updateFinancial,updateShareholders,plainText,numberFrom,uniquePeriods,parseChartPreview};
 })();
 window.FolioEngine=FolioEngine;
