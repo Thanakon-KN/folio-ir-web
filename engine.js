@@ -230,7 +230,7 @@ const FolioEngine = (() => {
     const byId=new Map(summary.displayPeriods.map(period=>[period.id,period]));if(selection.some(id=>!byId.has(id))||new Set(selection).size!==selection.length)throw new Error('ตัวเลือกงวดไม่ตรงกับผลตรวจ กรุณาตรวจไฟล์ใหม่');return selection.map(id=>byId.get(id));
   };
   const aliases={
-    revenue:['sales','netsales','turnover','totalrevenue','totalrevenues','revenuefromoperations','revenuefromcontractswithcustomers','salesandserviceincome','รายได้','รายได้รวม','รายได้จากการขายและบริการ','รายได้จากการขายสินค้าและการให้บริการ'],
+    revenue:['sales','netsales','turnover','totalrevenue','totalrevenues','revenuefromoperations','revenuefromcontractswithcustomers','salesandserviceincome','revenuesfromsalesandservices','รายได้','รายได้รวม','รายได้จากการขายและบริการ','รายได้จากการขายสินค้าและการให้บริการ'],
     costofsales:['costofgoodsold','costofsalesandservices','ต้นทุนขาย','ต้นทุนขายและบริการ','ต้นทุนสินค้าและบริการ'],
     netprofit:['netincome','profitforperiod','profitfortheyear','netprofitfortheperiod','profitattributabletoownersoftheparent','netprofitattributabletoownersoftheparent','กำไรสุทธิ','กำไรขาดทุนสุทธิ','กำไร(ขาดทุน)สุทธิ','กำไรสุทธิส่วนที่เป็นของผู้ถือหุ้นบริษัทใหญ่'],
     grossprofit:['กำไรขั้นต้น','กำไร(ขาดทุน)ขั้นต้น'], operatingprofit:['operatingincome','profitfromoperations','กำไรจากการดำเนินงาน','กำไรจากการปฏิบัติงาน','กำไร(ขาดทุน)จากการดำเนินงาน'],
@@ -579,6 +579,7 @@ const FolioEngine = (() => {
       const labels=[];
       for(const parent of [scope,...parentScopes]){
         for(const key of ['name','label','title','metric','series']){const value=directTextProperty(code,parent,key,scopes);if(value)labels.push(value);}
+        const legend=arrayProperty(code,parent,'legend',scopes);if(legend)for(const value of parseArray(legend.inner))if(typeof value==='string'&&value.trim())labels.unshift(value.trim());
         const objectKey=scopeKey(code,parent);if(objectKey)labels.push(objectKey);
       }
       const comparisonKind=comparisonType(sectionKey)||labels.map(comparisonType).find(Boolean)||'';
