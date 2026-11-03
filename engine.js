@@ -247,10 +247,11 @@ const FolioEngine = (() => {
     for(const [canonical,variants] of Object.entries(aliases))if(key===canonical||variants.some(item=>normalize(item)===key))return canonical;
     return key;
   };
-  const comparisonType=value=>{const text=plainText(value);if(/\b(?:y\s*[-/]?\s*o\s*[-/]?\s*y|year[ -]*over[ -]*year)\b|ปีก่อน/i.test(text))return 'yoy';if(/\b(?:q\s*[-/]?\s*o\s*[-/]?\s*q|quarter[ -]*over[ -]*quarter)\b|ไตรมาสก่อน/i.test(text))return 'qoq';return '';};
+  const comparisonType=value=>{const text=plainText(value).replace(/[_-]+/g,' ');if(/\b(?:y\s*o\s*y|yoy|year\s*over\s*year)\b|ปีก่อน/i.test(text))return 'yoy';if(/\b(?:q\s*o\s*q|qoq|quarter\s*over\s*quarter)\b|ไตรมาสก่อน/i.test(text))return 'qoq';return '';};
+  const comparisonBase=value=>plainText(value).replace(/\b(?:y\s*o\s*y|yoy|year\s*over\s*year|q\s*o\s*q|qoq|quarter\s*over\s*quarter|growth|change|comparison)\b|ปีก่อน|ไตรมาสก่อน/gi,' ').replace(/[_-]+/g,' ').trim();
   const labelSimilarity=(left,right)=>{
     const leftComparison=comparisonType(left),rightComparison=comparisonType(right);
-    if(leftComparison||rightComparison){if(leftComparison!==rightComparison)return 0;const strip=value=>normalize(plainText(value).replace(/\b(?:yoy|qoq|year[ -]*over[ -]*year|quarter[ -]*over[ -]*quarter|growth|change|comparison)\b|ปีก่อน|ไตรมาสก่อน/gi,''));const a=strip(left),b=strip(right);if(a===b)return 1;if(!a||!b)return 0;const at=new Set(a.match(/[\p{L}\p{N}]+/gu)||[]),bt=new Set(b.match(/[\p{L}\p{N}]+/gu)||[]);let overlap=0;for(const token of at)if(bt.has(token))overlap++;return overlap/(at.size+bt.size-overlap);}
+    if(leftComparison||rightComparison){if(leftComparison!==rightComparison)return 0;const a=normalize(comparisonBase(left)),b=normalize(comparisonBase(right));if(a===b)return 1;if(!a||!b)return 0;const at=new Set(a.match(/[\p{L}\p{N}]+/gu)||[]),bt=new Set(b.match(/[\p{L}\p{N}]+/gu)||[]);let overlap=0;for(const token of at)if(bt.has(token))overlap++;return overlap/(at.size+bt.size-overlap);}
     const a=canonicalLabel(left),b=canonicalLabel(right);if(!a||!b)return 0;if(a===b)return 1;
     if(a.length>3&&b.length>3&&(a.includes(b)||b.includes(a)))return Math.min(a.length,b.length)/Math.max(a.length,b.length)*0.96;
     const at=new Set((plainText(left).toLowerCase().match(/[\p{L}\p{N}]+/gu)||[]).filter(x=>!['total','million','baht','บาท','summary','detailed','the','of'].includes(x)));
@@ -484,17 +485,21 @@ const FolioEngine = (() => {
         for(const key of ['name','label','title','metric','series']){const value=directTextProperty(code,parent,key,scopes);if(value)labels.push(value);}
         const objectKey=scopeKey(code,parent);if(objectKey)labels.push(objectKey);
       }
+      const comparisonKind=comparisonType(sectionKey)||labels.map(comparisonType).find(Boolean)||'';
       let metric=null;for(const label of labels){metric=findMetric(summary.metrics,label,'summary',selected);if(metric)break;}
       const oldDataTokens=parseArray(dataArray.inner),oldIndex=new Map();oldPeriods.forEach((period,index)=>{if(period)oldIndex.set(period.id,index);});
       const seriesProperties=directArrayProperties(code,scope,scopes).filter(series=>series.name!=='period'&&series.name!=='dataset'&&!/markPoint|axis|annotation|color|symbol|label/i.test(series.name));
-      const matchedSeries=seriesProperties.map(series=>({series,values:parseArray(series.inner),metric:findMetric(summary.metrics,series.name,'summary',selected)})).filter(({values,metric})=>metric&&values.length===oldPeriodTokens.length&&values.every(value=>value===null||numberFrom(value)!==null));
-      if(!metric&&matchedSeries.length===1)metric=matchedSeries[0].metric;
+      const seriesCandidates=seriesProperties.map(series=>{const type=comparisonType(series.name),comparisonMetric=type?(findMetric(summary.metrics,series.name,'summary',selected)||findMetric(summary.metrics,(metric?.label||labels[0]||'')+' '+series.name,'summary',selected)):null,seriesMetric=findMetric(summary.metrics,type?comparisonBase(series.name):series.name,'summary',selected)||(type?metric:null);return {series,type,values:parseArray(series.inner),metric:seriesMetric,comparisonMetric};});
+      if(!metric)metric=seriesCandidates.find(candidate=>candidate.metric)?.metric||null;
       if(!metric){report.unmatched.push('ไม่พบแถวสรุปใน workbook ที่ตรงกับกราฟ '+(labels[0]||'ไม่มีชื่อ'));continue;}
+      const scopeComparisonMetric=comparisonKind&&comparisonType(metric.label)!==comparisonKind?findMetric(summary.metrics,metric.label+' '+comparisonKind,'summary',selected):null;
+      const matchedSeries=seriesCandidates.map(candidate=>{const type=candidate.type;return {...candidate,metric:candidate.metric||(type?metric:null),comparisonMetric:candidate.comparisonMetric||(type?findMetric(summary.metrics,metric.label+' '+candidate.series.name,'summary',selected):null)}}).filter(({values,metric:seriesMetric})=>seriesMetric&&values.length===oldPeriodTokens.length&&values.every(value=>value===null||numberFrom(value)!==null||typeof value==='string'&&(!value.trim()||/^[-–—]$/.test(value))));
+      const sourceFor=(sourceMetric,comparisonMetric,period,type='')=>{if(!sourceMetric)return null;if(!type)return sourceMetric.values[period.id]||null;return sourceMetric.comparisons?.[period.id+':'+type]||(comparisonType(sourceMetric.label)===type?sourceMetric.values[period.id]:null)||(comparisonMetric&&comparisonType(comparisonMetric.label)===type?comparisonMetric.values[period.id]:null)||null;};
       const isPeriodic=quarterly||periodicName||oldPeriods.some(isSubAnnual);
       const targetPeriods=selected.filter(p=>isSubAnnual(p)===isPeriodic);
       const nextIds=[],nextPeriods=[],nextData=[];
       for(const period of targetPeriods){
-        const at=oldIndex.get(period.id),source=metric.values[period.id];
+        const at=oldIndex.get(period.id),source=sourceFor(metric,scopeComparisonMetric,period,comparisonKind);
         const keepOld=at!==undefined&&!source;
         if(keepOld){nextIds.push(period.id);nextPeriods.push(arrayLiteral(oldPeriodTokens[at],oldPeriodTokens[0], 'period',period,sourceThai,language));nextData.push(oldDataTokens[at]??'null');}
         else if(source){nextIds.push(period.id);nextPeriods.push(arrayLiteral(period.id,oldPeriodTokens[0],'period',period,sourceThai,language));nextData.push(source.value===null?emptyArrayValue(source,oldDataTokens[at],oldDataTokens[0]):String(Number(source.value.toPrecision?.(12)??source.value)));}
@@ -504,10 +509,10 @@ const FolioEngine = (() => {
       const signature=scope.start+':'+dataArray.open;if(handled.has(signature))continue;handled.add(signature);
       patches.push({start:periodArray.open+1,end:periodArray.close,text:formatArrayItems(nextPeriods,periodArray.inner)});
       patches.push({start:dataArray.open+1,end:dataArray.close,text:formatArrayItems(nextData,dataArray.inner)});
-      for(const {series,values,metric:seriesMetric} of matchedSeries){
+      for(const {series,type,values,metric:seriesMetric,comparisonMetric} of matchedSeries){
         const aligned=[];for(const period of targetPeriods){
           if(!nextIds.includes(period.id))continue;
-          const at=oldIndex.get(period.id),source=seriesMetric.values[period.id];
+          const at=oldIndex.get(period.id),source=sourceFor(seriesMetric,comparisonMetric,period,type);
           if(at!==undefined&&!source)aligned.push(values[at]??'null');
           else if(source)aligned.push(source.value===null?emptyArrayValue(source,values[at],values[0]):String(Number(source.value.toPrecision?.(12)??source.value)));
           else aligned.push(at===undefined?'null':values[at]??'null');
@@ -516,7 +521,7 @@ const FolioEngine = (() => {
         report.changes.push({item:series.name,oldValue:'chart series',newValue:aligned.length+' aligned points',source:seriesMetric.sheet+' row '+seriesMetric.row});
       }
       const chartScope=parentScopes.find(parent=>directBooleanProperty(code,parent,'QoQ',scopes)||directBooleanProperty(code,parent,'qoq',scopes));
-      if(chartScope){for(const key of ['QoQ','qoq']){const body=code.slice(chartScope.start+1,chartScope.end-1),re=new RegExp('('+key+'\\s*:\\s*)(true|false)','i'),match=re.exec(body);if(match){const at=chartScope.start+1+match.index+match[1].length;if(!scopes.some(child=>child!==chartScope&&child.start>chartScope.start&&child.end<chartScope.end&&at>child.start&&at<child.end)){const id=chartScope.start+':'+at;if(!qoqPatches.has(id)){patches.push({start:at,end:at+match[2].length,text:nextData.some(v=>numberFrom(v)!==null)?'true':'false'});qoqPatches.add(id);}break;}}}}
+      if(chartScope&&(!comparisonKind||comparisonKind==='qoq')){for(const key of ['QoQ','qoq']){const body=code.slice(chartScope.start+1,chartScope.end-1),re=new RegExp('('+key+'\\s*:\\s*)(true|false)','i'),match=re.exec(body);if(match){const at=chartScope.start+1+match.index+match[1].length;if(!scopes.some(child=>child!==chartScope&&child.start>chartScope.start&&child.end<chartScope.end&&at>child.start&&at<child.end)){const id=chartScope.start+':'+at;if(!qoqPatches.has(id)){patches.push({start:at,end:at+match[2].length,text:nextData.some(v=>numberFrom(v)!==null)?'true':'false'});qoqPatches.add(id);}break;}}}}
       changed++;report.changes.push({item:labels[0]||metric.label,oldValue:'chart '+(isPeriodic?'periodic':'yearly')+' dataset',newValue:nextData.length+' points',source:metric.sheet+' row '+metric.row});
     }
     if(!changed&&code.trim()&&!report.unmatched.length)report.unmatched.push('ไม่พบ JavaScript chart source ที่มี period/dataset และชื่อ series เชื่อมกับแถวสรุปใน workbook');
