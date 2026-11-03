@@ -91,9 +91,11 @@ const FolioEngine = (() => {
         if(uniqueHeaderPeriods.length<2&&!candidates.some(x=>x.period.quarter)&&!(row.cells.length<=2&&row.cells.some(cell=>/^(?:year|period|ปี|งวด|FY)$/i.test(cell.text.trim()))))continue;
         sourcePeriods.push(...candidates.map(x=>x.period));
         const firstPeriodCol=Math.min(...candidates.map(x=>x.col));
-        const sectionContext=all.slice(Math.max(0,ri-4),ri).map(item=>item.cells.map(cell=>cell.text).join(' ')).join(' ');
+        const sectionContext=all.slice(Math.max(0,ri-4),ri+1).map(item=>item.cells.map(cell=>cell.text).join(' ')).join(' ');
         const sheetLabel=(book.name+' / '+sheet.name).toLowerCase();
-        const kind=/graph|chart|summary|home|overview|highlights summary|สรุป|กราฟ/i.test(sheetLabel+' '+sectionContext)?'summary':'detail';
+        const explicitDetail=/consolidated financial statements?|งบการเงินรวม|detailed financial|รายละเอียดงบการเงิน/i.test(sectionContext);
+        const summaryBlock=/financial highlights|highlights summary|graph|chart|summary|home|overview|สรุป|กราฟ/i.test(sheetLabel+' '+sectionContext);
+        const kind=explicitDetail?'detail':summaryBlock?'summary':'detail';
         const periods=candidates.map(x=>({period:x.period,col:x.col}));
         for(let rj=ri+1;rj<all.length;rj++){
           const data=all[rj];

@@ -18,7 +18,7 @@
   function updateButtons(){
     $('#inspect-files').disabled=!readyToInspect();$('#run-update').disabled=!readyToUpdate();$('#cancel-update').hidden=true;
     $('#display-selection').hidden=!ui.inspection||isShareholder();$('#display-selection').disabled=!ui.inspection;
-    $('#update-language').hidden=!ui.inspection||isShareholder();$('#update-language').disabled=!ui.inspection||isShareholder();
+    $('#update-language').hidden=isShareholder();$('#update-language').disabled=isShareholder();
     $('#update-mode').hidden=!ui.inspection||isShareholder();$('#update-mode').disabled=!ui.inspection;
     $('#inspect-help').textContent=ui.inspectBusy?'กำลังอ่านไฟล์ในเบราว์เซอร์…':!hasCode()?'วาง HTML/Vue หรือ JavaScript ก่อนตรวจไฟล์':!ui.files.length?'เลือกไฟล์ข้อมูลต้นทางก่อนตรวจไฟล์':fileProblem()||'พร้อมตรวจข้อมูลในเครื่อง · หากแก้ไฟล์หรือโค้ด ต้องตรวจใหม่';
     $('#run-help').textContent=ui.busy?'กำลังสร้างโค้ดด้วยกฎที่กำหนดไว้…':!ui.inspection?'ตรวจไฟล์ก่อนดำเนินการ':isShareholder()?'พร้อมอัปเดตตามส่วนของผู้ถือหุ้นที่จับคู่ได้':'เลือกงวดและวิธีอัปเดตก่อนสร้างผลลัพธ์';
