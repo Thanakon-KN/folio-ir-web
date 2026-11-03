@@ -553,21 +553,6 @@ const FolioEngine = (() => {
           const updated=updateArrayItems(aligned,series.inner);
           if(updated!==series.inner){patches.push({start:series.open+1,end:series.close,text:updated});report.changes.push({item:series.name,oldValue:values.join(', '),newValue:aligned.join(', '),source:metric.sheet+' row '+metric.row});}
         }
-        // `total` is the stacked sum used by this chart. If the workbook does
-        // not provide a separate total row, derive it from the three named
-        // components instead of leaving its existing empty array untouched.
-        const total= namedSeries.find(series=>series.name==='total'),totalUpdate=updates.get('total');
-        if(total&&!totalUpdate){
-          const components=['totalAssets','totalLiabilities','totalShareholderEquity'].map(name=>updates.get(name));
-          if(components.every(Boolean)){
-            const values=targetPeriods.map((period,index)=>{
-              const items=components.map(component=>numberFrom(component.values[index]));
-              return items.every(value=>value!==null)?String(Number(items.reduce((sum,value)=>sum+value,0).toPrecision(12))):'null';
-            });
-            const updated=updateArrayItems(values,total.inner);
-            if(updated!==total.inner){patches.push({start:total.open+1,end:total.close,text:updated});report.changes.push({item:'total',oldValue:parseArray(total.inner).join(', '),newValue:values.join(', '),source:'คำนวณจาก totalAssets + totalLiabilities + totalShareholderEquity'});}
-          }
-        }
         if(updates.size){
           const periodItems=targetPeriods.map((period,index)=>{const at=oldIndex.get(period.id);return at!==undefined?oldPeriodRaw[at]:arrayLiteral(period.id,oldPeriodRaw[0]||shortPeriodTemplate,'period',period,sourceThai,language);}),updatedPeriods=updateArrayItems(periodItems,periodArray.inner);
           if(updatedPeriods!==periodArray.inner)patches.push({start:periodArray.open+1,end:periodArray.close,text:updatedPeriods});
@@ -613,32 +598,6 @@ const FolioEngine = (() => {
       if(updatedPeriods!==periodArray.inner)patches.push({start:periodArray.open+1,end:periodArray.close,text:updatedPeriods});
       if(updatedData!==dataArray.inner)patches.push({start:dataArray.open+1,end:dataArray.close,text:updatedData});
       if(chartValuesChanged)report.changes.push({item:metric.label+' chart '+(isPeriodic?'quarterly':'yearly')+' dataset',oldValue:oldDataRaw.join(', '),newValue:nextData.join(', '),source:metric.sheet+' row '+metric.row});
-      // Growth labels in markPointData are derived from the plotted values.
-      // Refresh their percentage when the chart contains a matching prior-year
-      // point, keeping the original label, quote style, and decimal precision.
-      const markPoints=arrayProperty(code,scope,'markPointData',scopes);
-      if(markPoints&&chartValuesChanged){
-        const values=nextData.map(numberFrom),latest=targetPeriods.reduce((best,period)=>!best||period.year>best.year||period.year===best.year&&periodOrder(period)>periodOrder(best)?period:best,null);
-        const latestIndex=targetPeriods.findIndex(period=>period.id===latest?.id);
-        const priorIndex=latest?targetPeriods.findIndex(period=>period.year===latest.year-1&&period.quarter===latest.quarter&&period.months===latest.months&&period.halfYear===latest.halfYear):-1;
-        if(priorIndex>=0&&values[latestIndex]!==null&&values[priorIndex]!==null&&values[priorIndex]!==0){
-          const growth=(values[latestIndex]/values[priorIndex]-1)*100;
-          for(const marker of scopes.filter(item=>item.start>markPoints.open&&item.end<=markPoints.close)){
-            if(!/^growth\s*y\s*o\s*y$/i.test(directTextProperty(code,marker,'name',scopes)))continue;
-            const body=code.slice(marker.start+1,marker.end-1),match=/(\bvalue\s*:\s*)(['"])([^'"]*)(\2)/i.exec(body);
-            if(!match)continue;
-            const oldNumber=match[3].match(/-?\d+(?:,\d{3})*(?:\.\d+)?/),places=oldNumber?decimalPlaces(oldNumber[0]):1;
-            const formatted=growth.toLocaleString('en-US',{minimumFractionDigits:places,maximumFractionDigits:places});
-            const replacement=match[3].replace(/-?\d+(?:,\d{3})*(?:\.\d+)?/,formatted);
-            const valueStart=marker.start+1+match.index+match[1].length+1;
-            patches.push({start:valueStart,end:valueStart+match[3].length,text:replacement});
-            for(const [key,value] of [['xAxis',latestIndex],['yAxis',values[latestIndex]]]){
-              const coordinate=new RegExp('('+key+'\\s*:\\s*)(-?\\d+(?:\\.\\d+)?)').exec(body);
-              if(coordinate){const start=marker.start+1+coordinate.index+coordinate[1].length;patches.push({start,end:start+coordinate[2].length,text:String(value)});}
-            }
-          }
-        }
-      }
       for(const {series,type,values,rawValues,metric:seriesMetric,comparisonMetric} of matchedSeries){
         const aligned=[];for(const period of targetPeriods){
           if(!nextIds.includes(period.id))continue;
@@ -673,9 +632,6 @@ const FolioEngine = (() => {
     const listRows=uniqueByName(allRows.filter(r=>/shareholder|holder|list|รายชื่อ|ผู้ถือหุ้น/i.test(r.sheet||'')));
     const rows=listRows.length?listRows:uniqueByName(allRows);
     if(!rows.length)report.unmatched.push('ยังไม่พบตารางรายชื่อที่มีหัวคอลัมน์ Shareholder/Name และ Shares');
-    const totalRows=graphRows.length?graphRows:rows.filter(r=>r.percent!==null);const total=totalRows.reduce((sum,row)=>sum+(row.percent??0),0);
-    if(totalRows.length&&Math.abs(total-100)>0.01)report.notes.push(`เปอร์เซ็นต์จาก ${graphRows.length?'Graph':'ตารางรายชื่อ'} รวม ${total.toFixed(2)}% ไม่เท่ากับ 100.00% · ไม่ปรับยอดอัตโนมัติ`);
-    if(totalRows.length&&Math.abs(total-100)<=0.01)report.notes.push(`ตรวจเปอร์เซ็นต์จาก ${graphRows.length?'Graph':'ตารางรายชื่อ'} รวม 100.00%`);
     let html=payload.html||'';
     const factRules={
       rightsType:{labels:['Rights Type','Type of rights','ประเภทสิทธิ','สิทธิประโยชน์'],format:'text'},
