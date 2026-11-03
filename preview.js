@@ -1,5 +1,60 @@
 'use strict';
 const htmlPreviewState = { source: 'original', width: 'desktop', lastHtml: null, timer: null };
+const jsDataPreviewState = { source: 'original', timer: null };
+function createJsDataPreview() {
+  if (document.querySelector('#js-data-preview')) return;
+  const card = document.createElement('details');
+  card.className = 'card preview-card layout-wide'; card.id = 'js-data-preview-card'; card.open = true;
+  const summary = document.createElement('summary'); summary.className = 'card-head';
+  summary.innerHTML = '<span class="card-heading"><span class="section-icon mint-icon">JS</span><span class="preview-card-title"><span class="section-kicker">PREVIEW</span>ตัวอย่างข้อมูลจาก JavaScript<small>ดู period และ dataset จากโค้ด</small></span></span><span class="preview-disclosure">ย่อ / ขยาย</span>';
+  card.append(summary);
+  const toolbar = document.createElement('div'); toolbar.className = 'preview-toolbar';
+  const sources = document.createElement('div'); sources.className = 'preview-source'; sources.setAttribute('role','group'); sources.setAttribute('aria-label','โค้ด JavaScript ที่ใช้แสดงตัวอย่าง');
+  for (const [source,label] of [['original','ต้นฉบับ'],['result','หลังอัปเดต']]) {
+    const button=document.createElement('button');button.type='button';button.dataset.jsPreviewSource=source;button.textContent=label;button.setAttribute('aria-pressed',String(source==='original'));sources.append(button);
+  }
+  toolbar.append(sources);
+  const hint=document.createElement('span');hint.className='js-preview-hint';hint.textContent='อ่านข้อมูลจากโค้ด · ไม่รัน JavaScript';toolbar.append(hint);card.append(toolbar);
+  const stage=document.createElement('div');stage.id='js-data-preview-content';stage.className='js-data-preview-content';
+  const empty=document.createElement('div');empty.className='preview-empty js-data-preview-empty';
+  const icon=document.createElement('span');icon.className='preview-empty-icon';icon.textContent='JS';
+  const title=document.createElement('strong');title.textContent='วาง JavaScript เพื่อดูข้อมูลกราฟ';
+  const detail=document.createElement('p');detail.textContent='preview จะแสดงชื่อกราฟ งวด และค่าที่อยู่ใน dataset โดยตรง';
+  empty.append(icon,title,detail);stage.append(empty);card.append(stage);
+  const caption=document.createElement('div');caption.className='preview-caption';caption.textContent='แสดงค่าจาก period และ dataset ตามโค้ดเดิม · ไม่มีการคำนวณตัวเลขหรือรันสคริปต์จากผู้ใช้';card.append(caption);
+  const htmlCard=document.querySelector('.preview-card');if(htmlCard)htmlCard.insertAdjacentElement('afterend',card);
+  sources.addEventListener('click',event=>{const button=event.target.closest('[data-js-preview-source]');if(!button)return;jsDataPreviewState.source=button.dataset.jsPreviewSource;renderJsDataPreview(true);});
+  card.addEventListener('toggle',event=>{if(event.currentTarget.open)queueJsDataPreview(true);});
+}
+function queueJsDataPreview(force=false) {
+  clearTimeout(jsDataPreviewState.timer);
+  jsDataPreviewState.timer=setTimeout(()=>renderJsDataPreview(force),force?0:180);
+}
+function renderJsDataPreview(force=false) {
+  const panel=document.querySelector('#js-data-preview-content');if(!panel||!window.FolioEngine)return;
+  const result=document.querySelector('#javascript-result').value.trim();
+  if(!result&&jsDataPreviewState.source==='result')jsDataPreviewState.source='original';
+  document.querySelectorAll('[data-js-preview-source]').forEach(button=>{
+    button.setAttribute('aria-pressed',String(button.dataset.jsPreviewSource===jsDataPreviewState.source));
+    if(button.dataset.jsPreviewSource==='result')button.disabled=!result;
+  });
+  if(!document.querySelector('#js-data-preview-card').open)return;
+  const code=document.querySelector(jsDataPreviewState.source==='result'?'#javascript-result':'#javascript-code').value;
+  panel.replaceChildren();
+  const charts=window.FolioEngine.parseChartPreview(code);
+  if(!charts.length){const empty=document.createElement('div');empty.className='preview-empty js-data-preview-empty';const icon=document.createElement('span');icon.className='preview-empty-icon';icon.textContent='JS';const title=document.createElement('strong');title.textContent='ยังไม่พบ period และ dataset';const detail=document.createElement('p');detail.textContent='preview รองรับชุดข้อมูลกราฟที่มี period และ dataset ใน window.chart';empty.append(icon,title,detail);panel.append(empty);return;}
+  for(const chart of charts){
+    const block=document.createElement('section');block.className='js-data-block';
+    const heading=document.createElement('div');heading.className='js-data-heading';
+    const name=document.createElement('strong');name.textContent=chart.title;heading.append(name);
+    const key=document.createElement('code');key.textContent=chart.key+(chart.periodType?' · '+chart.periodType:'');heading.append(key);
+    if(chart.unit){const unit=document.createElement('span');unit.className='js-data-unit';unit.textContent=chart.unit;heading.append(unit);}
+    block.append(heading);
+    const table=document.createElement('table');table.className='js-data-table';
+    const head=document.createElement('thead'),headRow=document.createElement('tr');for(const text of ['Period','Dataset']){const cell=document.createElement('th');cell.textContent=text;headRow.append(cell);}head.append(headRow);table.append(head);
+    const body=document.createElement('tbody');for(const row of chart.rows){const tr=document.createElement('tr');const period=document.createElement('td');period.textContent=row.period;const value=document.createElement('td');value.textContent=row.value;tr.append(period,value);body.append(tr);}table.append(body);block.append(table);panel.append(block);
+  }
+}
 const previewBaseStyle = `
   *{box-sizing:border-box}html{color-scheme:light}body{margin:0;padding:28px;background:#fff;color:#24364b;font:14px/1.65 "Segoe UI",Tahoma,sans-serif;overflow-wrap:anywhere}
   h1,h2,h3,h4{color:#14283f;line-height:1.4;margin:0 0 16px}h1{font-size:28px}h2{font-size:24px}h3{font-size:19px}p{margin:0 0 16px}
@@ -98,3 +153,5 @@ document.querySelector('#refresh-preview').addEventListener('click', () => rende
 document.querySelector('.preview-card').addEventListener('toggle', event => {
   if (event.currentTarget.open) queueHtmlPreview(true);
 });
+createJsDataPreview();
+queueJsDataPreview(true);
