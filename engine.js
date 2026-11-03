@@ -219,7 +219,7 @@ const FolioEngine = (() => {
     const byId=new Map(summary.displayPeriods.map(period=>[period.id,period]));if(selection.some(id=>!byId.has(id))||new Set(selection).size!==selection.length)throw new Error('ตัวเลือกงวดไม่ตรงกับผลตรวจ กรุณาตรวจไฟล์ใหม่');return selection.map(id=>byId.get(id));
   };
   const aliases={
-    revenue:['sales','netsales','turnover','totalrevenue','totalrevenues','revenuefromoperations','revenuefromcontractswithcustomers','salesandserviceincome','revenuefromsalesandservices','revenuesfromsalesandservices','รายได้','รายได้รวม','รายได้จากการขายและบริการ','รายได้จากการขายสินค้าและการให้บริการ'],
+    revenue:['sales','netsales','turnover','totalrevenue','totalrevenues','revenuefromoperations','revenuefromcontractswithcustomers','salesandserviceincome','revenuesfromsalesandservices','รายได้','รายได้รวม','รายได้จากการขายและบริการ','รายได้จากการขายสินค้าและการให้บริการ'],
     costofsales:['costofgoodsold','costofsalesandservices','ต้นทุนขาย','ต้นทุนขายและบริการ','ต้นทุนสินค้าและบริการ'],
     netprofit:['netincome','profitforperiod','profitfortheyear','netprofitfortheperiod','profitattributabletoownersoftheparent','netprofitattributabletoownersoftheparent','กำไรสุทธิ','กำไรขาดทุนสุทธิ','กำไร(ขาดทุน)สุทธิ','กำไรสุทธิส่วนที่เป็นของผู้ถือหุ้นบริษัทใหญ่'],
     grossprofit:['กำไรขั้นต้น','กำไร(ขาดทุน)ขั้นต้น'], operatingprofit:['operatingincome','profitfromoperations','กำไรจากการดำเนินงาน','กำไรจากการปฏิบัติงาน','กำไร(ขาดทุน)จากการดำเนินงาน'],
@@ -249,7 +249,7 @@ const FolioEngine = (() => {
     return overlap/(at.size+bt.size-overlap);
   };
   const findMetric=(metrics,label,kind='',periods=[])=>{
-    let ranked=metrics.map(metric=>({metric,score:Math.max(...(metric.labels?.length?metric.labels:[metric.label]).map(candidate=>labelSimilarity(label,candidate))),coverage:periods.filter(period=>metric.values[period.id]).length})).filter(x=>x.score>=0.8);
+    let ranked=metrics.map(metric=>({metric,score:Math.max(...(metric.labels?.length?metric.labels:[metric.label]).map(candidate=>labelSimilarity(label,candidate))),coverage:periods.filter(period=>metric.values[period.id]).length})).filter(x=>x.score>=0.55);
     if(!ranked.length)return null;
     if(kind){const byKind=ranked.filter(item=>item.metric.kind===kind);if(byKind.length)ranked=byKind;}
     if(kind==='summary'){const financialHighlights=ranked.filter(item=>/financial\s*highlights|ข้อมูลสำคัญทางการเงิน/i.test(item.metric.sheetName||''));if(financialHighlights.length)ranked=financialHighlights;}
@@ -262,7 +262,7 @@ const FolioEngine = (() => {
   };
   const findComparisonMetric=(metrics,label,type,kind='',periods=[])=>{
     const direct=findMetric(metrics,label+' '+type,kind,periods);if(direct&&comparisonType(direct.label)===type)return direct;
-    const base=comparisonBase(label);let ranked=metrics.map(metric=>{const labels=metric.labels?.length?metric.labels:[metric.label];const score=Math.max(0,...labels.filter(candidate=>comparisonType(candidate)===type).map(candidate=>labelSimilarity(base,comparisonBase(candidate))));return {metric,score,coverage:periods.filter(period=>metric.values[period.id]).length};}).filter(item=>item.score>=0.8);
+    const base=comparisonBase(label);let ranked=metrics.map(metric=>{const labels=metric.labels?.length?metric.labels:[metric.label];const score=Math.max(0,...labels.filter(candidate=>comparisonType(candidate)===type).map(candidate=>labelSimilarity(base,comparisonBase(candidate))));return {metric,score,coverage:periods.filter(period=>metric.values[period.id]).length};}).filter(item=>item.score>=0.55);
     if(kind){const byKind=ranked.filter(item=>item.metric.kind===kind);if(byKind.length)ranked=byKind;}
     if(kind==='summary'){const financialHighlights=ranked.filter(item=>/financial\s*highlights|ข้อมูลสำคัญทางการเงิน/i.test(item.metric.sheetName||''));if(financialHighlights.length)ranked=financialHighlights;}
     ranked.sort((a,b)=>b.score-a.score||b.coverage-a.coverage||(kind&&a.metric.kind===kind?-1:0)-(kind&&b.metric.kind===kind?-1:0));
