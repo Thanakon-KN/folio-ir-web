@@ -75,7 +75,7 @@ const FolioEngine = (() => {
         const row=all[ri];
         const quarterOnly=row.cells.map(cell=>({cell,match:cell.text.match(/^(?:Q\s*([1-4])|([1-4])\s*Q|Quarter\s*([1-4])|ไตรมาส\s*([1-4]))$/i)})).filter(x=>x.match);
         const direct=row.cells.map(cell=>({cell,period:periodFrom(cell.text)})).filter(x=>x.period);
-        const hasNumericBelow=col=>{for(let i=ri+1;i<Math.min(all.length,ri+9);i++){if(all[i].row>all[i-1].row+2)break;const cell=all[i].cells.find(item=>item.col===col);if(cell&&(numberFrom(cell.raw)!==null||numberFrom(cell.text)!==null))return true;}return false;};
+        const hasNumericBelow=col=>{for(let i=ri+1;i<Math.min(all.length,ri+31);i++){const next=all[i],nextPeriods=next.cells.filter(cell=>periodFrom(cell.text)),nextQuarters=next.cells.filter(cell=>/^(?:Q\s*[1-4]|[1-4]\s*Q|Quarter\s*[1-4]|ไตรมาส\s*[1-4])$/i.test(cell.text));if(nextPeriods.length>=2||nextQuarters.length>=2)break;const cell=next.cells.find(item=>item.col===col);if(cell&&(numberFrom(cell.raw)!==null||numberFrom(cell.text)!==null))return true;}return false;};
         const periodsByCol=[];
         if(quarterOnly.length){
           for(const item of quarterOnly){
@@ -97,7 +97,9 @@ const FolioEngine = (() => {
         const periods=candidates.map(x=>({period:x.period,col:x.col}));
         for(let rj=ri+1;rj<all.length;rj++){
           const data=all[rj];
-          if(data.row>all[rj-1].row+2) break;
+          if(data.row>all[rj-1].row+20) break;
+          const nextPeriods=data.cells.filter(cell=>periodFrom(cell.text)),nextQuarters=data.cells.filter(cell=>/^(?:Q\s*[1-4]|[1-4]\s*Q|Quarter\s*[1-4]|ไตรมาส\s*[1-4])$/i.test(cell.text));
+          if(nextPeriods.length>=2||nextQuarters.length>=2)break;
           const before=data.cells.filter(cell=>cell.col<firstPeriodCol && cell.text.trim());
           if(!before.length) continue;
           const label=before[before.length-1].text;
@@ -195,14 +197,16 @@ const FolioEngine = (() => {
     const valid=new Set(summary.displayPeriods.map(p=>p.id));if(selection.some(id=>!valid.has(id))||new Set(selection).size!==selection.length)throw new Error('ตัวเลือกงวดไม่ตรงกับผลตรวจ กรุณาตรวจไฟล์ใหม่');return summary.displayPeriods.filter(p=>selection.includes(p.id));
   };
   const aliases={
-    revenue:['sales','totalrevenue','revenuefromoperations','revenuefromcontractswithcustomers','รายได้','รายได้รวม','รายได้จากการขายและบริการ'],
-    netprofit:['netincome','profitforperiod','profitfortheyear','netprofitfortheperiod','กำไรสุทธิ'],
-    grossprofit:['กำไรขั้นต้น'], operatingprofit:['กำไรจากการดำเนินงาน','กำไรจากการปฏิบัติงาน'],
-    profitbeforetax:['ebt','profitbeforeincometax','กำไรก่อนภาษี','กำไรก่อนภาษีเงินได้'],
+    revenue:['sales','netsales','turnover','totalrevenue','revenuefromoperations','revenuefromcontractswithcustomers','salesandserviceincome','รายได้','รายได้รวม','รายได้จากการขายและบริการ','รายได้จากการขายสินค้าและการให้บริการ'],
+    costofsales:['costofgoodsold','costofsalesandservices','ต้นทุนขาย','ต้นทุนขายและบริการ','ต้นทุนสินค้าและบริการ'],
+    netprofit:['netincome','profitforperiod','profitfortheyear','netprofitfortheperiod','profitattributabletoownersoftheparent','netprofitattributabletoownersoftheparent','กำไรสุทธิ','กำไรขาดทุนสุทธิ','กำไร(ขาดทุน)สุทธิ','กำไรสุทธิส่วนที่เป็นของผู้ถือหุ้นบริษัทใหญ่'],
+    grossprofit:['กำไรขั้นต้น','กำไร(ขาดทุน)ขั้นต้น'], operatingprofit:['operatingincome','profitfromoperations','กำไรจากการดำเนินงาน','กำไรจากการปฏิบัติงาน','กำไร(ขาดทุน)จากการดำเนินงาน'],
+    profitbeforetax:['ebt','profitbeforeincometax','profitbeforetaxation','กำไรก่อนภาษี','กำไรก่อนภาษีเงินได้','กำไร(ขาดทุน)ก่อนภาษี'],
+    sellingandadministrativeexpenses:['sga','sellingandadministrativeexpenses','ค่าใช้จ่ายในการขายและบริหาร','ค่าใช้จ่ายในการขายและการบริหาร'],
     totalassets:['assets','สินทรัพย์รวม'], totalliabilities:['liabilities','หนี้สินรวม'],
     totalshareholdersequity:['shareholdersequity','equity','ส่วนของผู้ถือหุ้น','ส่วนของเจ้าของ'],
-    earningspershare:['eps','กำไรต่อหุ้น'],
-    netprofitattributabletoowners:['profitattributabletoowners','กำไรสุทธิส่วนที่เป็นของผู้ถือหุ้นบริษัทใหญ่'],
+    earningspershare:['eps','กำไรต่อหุ้น','กำไรสุทธิต่อหุ้น'],
+    ebitda:['กำไรก่อนดอกเบี้ยภาษีค่าเสื่อมราคาและค่าตัดจำหน่าย'],
     cashflowfromoperatingactivities:['operatingcashflow','กระแสเงินสดจากกิจกรรมดำเนินงาน']
   };
   const canonicalLabel=value=>{
@@ -229,12 +233,16 @@ const FolioEngine = (() => {
     return signatures.size===1?top.metric:null;
   };
   function scanRows(html){
-    const out=[];const re=/<tr\b[^>]*>[\s\S]*?<\/tr>/gi;let m;
-    while((m=re.exec(html))){const raw=m[0], cells=[];const cellRe=/<(td|th)\b([^>]*)>([\s\S]*?)<\/\1>/gi;let c;
-      while((c=cellRe.exec(raw)))cells.push({tag:c[1],attrs:c[2],inner:c[3],raw:c[0],start:c.index,end:cellRe.lastIndex,text:plainText(c[3])});
+    const out=[],occupied=new Map(),re=/<tr\b[^>]*>[\s\S]*?<\/tr>/gi;let m;
+    while((m=re.exec(html))){const raw=m[0],cells=[],carried=new Set(occupied.keys()),cellRe=/<(td|th)\b([^>]*)>([\s\S]*?)<\/\1>/gi;let c,column=0;
+      while((c=cellRe.exec(raw))){const span=Math.max(1,Number(c[2].match(/\bcolspan\s*=\s*["']?(\d+)/i)?.[1]||1));while(Array.from({length:span},(_,i)=>occupied.has(column+i)).some(Boolean))column++;
+        const rowSpan=Math.max(1,Number(c[2].match(/\browspan\s*=\s*["']?(\d+)/i)?.[1]||1));cells.push({tag:c[1],attrs:c[2],inner:c[3],raw:c[0],start:c.index,end:cellRe.lastIndex,text:plainText(c[3]),column,span,endColumn:column+span,rowSpan});
+        if(rowSpan>1)for(let col=column;col<column+span;col++)occupied.set(col,rowSpan-1);column+=span;}
+      for(const col of carried){const remaining=occupied.get(col);if(remaining<=1)occupied.delete(col);else occupied.set(col,remaining-1);}
       if(cells.length)out.push({raw,start:m.index,end:re.lastIndex,cells});}
     return out;
   }
+  const cellAtColumn=(row,column)=>row.cells.find(cell=>column>=cell.column&&column<cell.endColumn)||null;
   const replaceCellText=(raw,oldText,newText)=>{
     let next=raw;
     // Vue numeric components commonly store a value in :number or number attributes.
@@ -268,31 +276,36 @@ const FolioEngine = (() => {
     const tables=[...html.matchAll(/<table\b[\s\S]*?<\/table>/gi)];let changed=false,matched=false;
     let updated=html.replace(/<table\b[\s\S]*?<\/table>/gi,table=>{
       const rows=scanRows(table);let headIndex=-1,periodCols=[];
-      rows.forEach((row,index)=>{const ps=row.cells.map((c,i)=>({period:periodFrom(c.text),i})).filter(x=>x.period);if(ps.length>periodCols.length&&ps.length>=1){periodCols=ps;headIndex=index;}});
+      rows.forEach((row,index)=>{const ps=row.cells.map(c=>({period:periodFrom(c.text),column:c.column,span:c.span})).filter(x=>x.period);if(ps.length>periodCols.length&&ps.length>=1){periodCols=ps;headIndex=index;}});
       if(headIndex<0||!periodCols.length)return table;
-      const known=new Map(periodCols.map(x=>[x.period.id,x.i]));const wanted=selected.map(p=>p.id);const sourcePeriod=new Map(summary.displayPeriods.map(p=>[p.id,p]));
+      if(periodCols.some(period=>period.span!==1)){report.unmatched.push('พบหัวงวดที่ใช้ colspan · คงตารางเดิมไว้เพื่อไม่ให้คอลัมน์เลื่อน');return table;}
+      const tablePeriodStart=Math.min(...periodCols.map(p=>p.column)),tablePeriodEnd=Math.max(...periodCols.map(p=>p.column+p.span));
+      const unsafeRow=rows.find((row,index)=>index!==headIndex&&row.cells.some(cell=>cell.span>1&&cell.column<tablePeriodEnd&&cell.endColumn>tablePeriodStart)&&metricLabelCells(row,periodCols).some(cell=>findMetric(summary.metrics,cell.text,'detail',selected)));
+      if(unsafeRow){report.unmatched.push(`ตารางมี colspan ในแถว “${metricLabelCell(unsafeRow,periodCols)?.text||'ไม่ทราบชื่อ'}” · คงตารางเดิมไว้เพื่อไม่ให้ข้อมูลเหลื่อม`);return table;}
+      const known=new Map(periodCols.map(x=>[x.period.id,x.column]));const wanted=selected.map(p=>p.id);const sourcePeriod=new Map(summary.displayPeriods.map(p=>[p.id,p]));
       let tableRows=rows.slice();
       for(let ri=0;ri<tableRows.length;ri++){
         const row=tableRows[ri];if(ri===headIndex)continue;
-        const labelCell=metricLabelCell(row,periodCols);if(!labelCell)continue;
-        const metric=findMetric(summary.metrics,labelCell.text,'detail',selected);
-        if(!metric){const containsNumber=periodCols.some(period=>numberFrom(row.cells[period.i]?.text)!==null);if(containsNumber)report.unmatched.push(`HTML “${labelCell.text}” มีค่าตัวเลขแต่จับคู่กับแถว workbook ไม่ได้ · คงแถวเดิมไว้`);continue;}
+        const labelCandidates=metricLabelCells(row,periodCols);if(!labelCandidates.length)continue;
+        let labelCell=labelCandidates[0],metric=null;for(const candidate of labelCandidates){metric=findMetric(summary.metrics,candidate.text,'detail',selected);if(metric){labelCell=candidate;break;}}
+        if(!metric){const containsNumber=periodCols.some(period=>numberFrom(cellAtColumn(row,period.column)?.text)!==null);if(containsNumber)report.unmatched.push(`HTML “${labelCell.text}” มีค่าตัวเลขแต่จับคู่กับแถว workbook ไม่ได้ · คงแถวเดิมไว้`);continue;}
         matched=true;
-        const startCol=Math.min(...periodCols.map(p=>p.i));const baseCells=row.cells.filter((_,i)=>i<startCol).map(c=>c.raw);const valueCells=[];
-        for(const id of wanted){const oldIndex=known.get(id),old=oldIndex===undefined?null:row.cells[oldIndex];const source=metric.values[id];let value;
+        const startCol=tablePeriodStart,endCol=tablePeriodEnd;
+        const baseCells=row.cells.filter(c=>c.endColumn<=startCol).map(c=>c.raw),trailingCells=row.cells.filter(c=>c.column>=endCol).map(c=>c.raw),valueCells=[];
+        for(const id of wanted){const oldIndex=known.get(id),old=oldIndex===undefined?null:cellAtColumn(row,oldIndex);const source=metric.values[id];let value;
           if(mode==='add'&&old)value=old.text;
-          else if(source)value=formatFinancialValue(old?.text??row.cells[periodCols[0].i]?.text??source.text,source.value,metric.label);
+          else if(source)value=formatFinancialValue(old?.text??cellAtColumn(row,periodCols[0].column)?.text??source.text,source.value,metric.label);
           else if(old)value=old.text;
           else {value='';report.unmatched.push(`HTML “${labelCell.text}” ไม่มีค่า ${sourcePeriod.get(id)?.label||id} จาก workbook`);}
-          if(old){let raw=replaceCellText(old.raw,old.text,value);valueCells.push(raw);}else{const template=row.cells[periodCols[0].i];if(template)valueCells.push(replaceCellText(template.raw,template.text,value));}
+          if(old){let raw=replaceCellText(old.raw,old.text,value);valueCells.push(raw);}else{const template=cellAtColumn(row,periodCols[0].column);if(template)valueCells.push(replaceCellText(template.raw,template.text,value));}
         }
-        const newRaw=replaceRowCells(row,[...baseCells,...valueCells]);
+        const newRaw=replaceRowCells(row,[...baseCells,...valueCells,...trailingCells]);
         if(newRaw!==row.raw){changed=true;tableRows[ri]={...row,raw:newRaw};report.changes.push({item:labelCell.text,oldValue:'ตารางเดิม',newValue:wanted.map(id=>sourcePeriod.get(id)?.label||id).join(', '),source:metric.sheet+' row '+metric.row});}
       }
       // Restrict rewriting to tables containing recognizable financial metric rows.
-      if(!tableRows.some((row,i)=>i!==headIndex&&findMetric(summary.metrics,metricLabelCell(row,periodCols)?.text,'detail',selected)))return table;
-      const header=tableRows[headIndex],firstPeriod=Math.min(...periodCols.map(p=>p.i));const base=header.cells.filter((_,i)=>i<firstPeriod).map(c=>c.raw);const template=header.cells[periodCols[0].i];const headCells=wanted.map(id=>{const found=known.get(id);const cell=found===undefined?template:header.cells[found];const label=sourcePeriod.get(id)?.label||id;return cell?replaceCellText(cell.raw,cell.text,label):`<th>${label}</th>`;});
-      tableRows[headIndex]={...header,raw:replaceRowCells(header,[...base,...headCells])};
+      if(!tableRows.some((row,i)=>i!==headIndex&&metricLabelCells(row,periodCols).some(cell=>findMetric(summary.metrics,cell.text,'detail',selected))))return table;
+      const header=tableRows[headIndex],firstPeriod=Math.min(...periodCols.map(p=>p.column)),lastPeriod=Math.max(...periodCols.map(p=>p.column+p.span));const base=header.cells.filter(c=>c.endColumn<=firstPeriod).map(c=>c.raw),trailing=header.cells.filter(c=>c.column>=lastPeriod).map(c=>c.raw);const template=cellAtColumn(header,periodCols[0].column);const headCells=wanted.map(id=>{const found=known.get(id),cell=found===undefined?template:cellAtColumn(header,found);const label=sourcePeriod.get(id)?.label||id;return cell?replaceCellText(cell.raw,cell.text,label):`<th>${label}</th>`;});
+      tableRows[headIndex]={...header,raw:replaceRowCells(header,[...base,...headCells,...trailing])};
       // Apply row-level column filtering/insertion only if the table header exposes period columns.
       return tableRows.map((row,i)=>({row,i})).sort((a,b)=>b.row.start-a.row.start).reduce((result,item)=>result.slice(0,item.row.start)+item.row.raw+result.slice(item.row.end),table);
     });
@@ -319,7 +332,8 @@ const FolioEngine = (() => {
     if(changed)report.notes.push('อัปเดตตัวเลข counter-number จากงวดล่าสุดที่เลือก ('+latest.label+')');
     return output;
   }
-  function metricLabelCell(row,periodCols){const first=Math.min(...periodCols.map(p=>p.i));return row.cells.filter((cell,i)=>i<first&&cell.text.trim()).at(-1);}
+  function metricLabelCells(row,periodCols){const first=Math.min(...periodCols.map(p=>p.column));return row.cells.filter(cell=>cell.endColumn<=first&&cell.text.trim()).reverse();}
+  function metricLabelCell(row,periodCols){return metricLabelCells(row,periodCols)[0];}
   function parseArray(text){
     const parts=[];let start=0,quote='',escaped=false;
     for(let i=0;i<text.length;i++){const ch=text[i];if(quote){if(escaped)escaped=false;else if(ch==='\\')escaped=true;else if(ch===quote)quote='';continue;}if(ch==='"'||ch==="'"){quote=ch;continue;}if(ch===','){parts.push(text.slice(start,i).trim());start=i+1;}}

@@ -12,6 +12,7 @@ Open `index.html` in a modern browser. To publish with GitHub Pages, place the c
 
 - Reads XLSX, XLS, XLSM, CSV, and TSV files locally in the browser.
 - Detects period columns arranged horizontally, including quarter labels whose fiscal year is in the preceding header row; reads numeric cached display values when raw formula values are blank.
+- Scans through blank spacer rows between workbook headers and data, and maps HTML table columns using `colspan` / `rowspan` positions while preserving trailing note columns.
 - Inspects periods found in the workbook and in the existing HTML / JavaScript.
 - Requires an explicit period selection and Add or Replace choice.
 - Matches table rows and chart series by normalized labels, common aliases, and token similarity; prefers detailed financial rows for tables and summary rows for charts.
