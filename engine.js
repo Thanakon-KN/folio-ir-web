@@ -260,8 +260,10 @@ const FolioEngine = (() => {
     return overlap/(at.size+bt.size-overlap);
   };
   const findMetric=(metrics,label,kind='',periods=[])=>{
-    const ranked=metrics.map(metric=>({metric,score:Math.max(...(metric.labels?.length?metric.labels:[metric.label]).map(candidate=>labelSimilarity(label,candidate))),coverage:periods.filter(period=>metric.values[period.id]).length})).filter(x=>x.score>=0.55);
+    let ranked=metrics.map(metric=>({metric,score:Math.max(...(metric.labels?.length?metric.labels:[metric.label]).map(candidate=>labelSimilarity(label,candidate))),coverage:periods.filter(period=>metric.values[period.id]).length})).filter(x=>x.score>=0.55);
     if(!ranked.length)return null;
+    if(kind){const byKind=ranked.filter(item=>item.metric.kind===kind);if(byKind.length)ranked=byKind;}
+    if(kind==='summary'){const financialHighlights=ranked.filter(item=>/financial\s*highlights|ข้อมูลสำคัญทางการเงิน/i.test(item.metric.sheetName||''));if(financialHighlights.length)ranked=financialHighlights;}
     ranked.sort((a,b)=>b.score-a.score||b.coverage-a.coverage||(kind&&a.metric.kind===kind?-1:0)-(kind&&b.metric.kind===kind?-1:0));
     const top=ranked[0],sameScore=ranked.filter(x=>Math.abs(x.score-top.score)<0.035&&x.coverage===top.coverage);
     if(sameScore.length>1&&kind){const preferred=sameScore.filter(x=>x.metric.kind===kind);if(preferred.length===1)return preferred[0].metric;}
@@ -271,7 +273,9 @@ const FolioEngine = (() => {
   };
   const findComparisonMetric=(metrics,label,type,kind='',periods=[])=>{
     const direct=findMetric(metrics,label+' '+type,kind,periods);if(direct&&comparisonType(direct.label)===type)return direct;
-    const base=comparisonBase(label),ranked=metrics.map(metric=>{const labels=metric.labels?.length?metric.labels:[metric.label];const score=Math.max(0,...labels.filter(candidate=>comparisonType(candidate)===type).map(candidate=>labelSimilarity(base,comparisonBase(candidate))));return {metric,score,coverage:periods.filter(period=>metric.values[period.id]).length};}).filter(item=>item.score>=0.55);
+    const base=comparisonBase(label);let ranked=metrics.map(metric=>{const labels=metric.labels?.length?metric.labels:[metric.label];const score=Math.max(0,...labels.filter(candidate=>comparisonType(candidate)===type).map(candidate=>labelSimilarity(base,comparisonBase(candidate))));return {metric,score,coverage:periods.filter(period=>metric.values[period.id]).length};}).filter(item=>item.score>=0.55);
+    if(kind){const byKind=ranked.filter(item=>item.metric.kind===kind);if(byKind.length)ranked=byKind;}
+    if(kind==='summary'){const financialHighlights=ranked.filter(item=>/financial\s*highlights|ข้อมูลสำคัญทางการเงิน/i.test(item.metric.sheetName||''));if(financialHighlights.length)ranked=financialHighlights;}
     ranked.sort((a,b)=>b.score-a.score||b.coverage-a.coverage||(kind&&a.metric.kind===kind?-1:0)-(kind&&b.metric.kind===kind?-1:0));
     if(!ranked.length)return null;const top=ranked[0],ties=ranked.filter(item=>Math.abs(item.score-top.score)<0.035&&item.coverage===top.coverage);if(ties.length===1)return top.metric;
     const signatures=new Set(ties.map(item=>periods.map(period=>item.metric.values[period.id]?.value??'').join('|')));return signatures.size===1?top.metric:null;
@@ -427,11 +431,13 @@ const FolioEngine = (() => {
   }
   function targetLabelCells(row,periodCols,language){return metricLabelCells(row,periodCols).filter(cell=>matchesTargetLanguage(cell.text,language));}
   function metricLabelCell(row,periodCols){return metricLabelCells(row,periodCols)[0];}
+  function rawArrayItems(text){
+    const parts=[];let start=0,quote='',escaped=false,depth=0;
+    for(let i=0;i<text.length;i++){const ch=text[i];if(quote){if(escaped)escaped=false;else if(ch==='\\')escaped=true;else if(ch===quote)quote='';continue;}if(ch==='"'||ch==="'"){quote=ch;continue;}if(ch==='['||ch==='{')depth++;else if(ch===']'||ch==='}')depth=Math.max(0,depth-1);else if(ch===','&&depth===0){parts.push(text.slice(start,i).trim());start=i+1;}}
+    if(text.slice(start).trim())parts.push(text.slice(start).trim());return parts;
+  }
   function parseArray(text){
-    const parts=[];let start=0,quote='',escaped=false;
-    for(let i=0;i<text.length;i++){const ch=text[i];if(quote){if(escaped)escaped=false;else if(ch==='\\')escaped=true;else if(ch===quote)quote='';continue;}if(ch==='"'||ch==="'"){quote=ch;continue;}if(ch===','){parts.push(text.slice(start,i).trim());start=i+1;}}
-    if(text.slice(start).trim())parts.push(text.slice(start).trim());
-    return parts.map(x=>{try{return JSON.parse(x.replace(/^'/,'"').replace(/'$/,'"'));}catch{return x.replace(/^['"]|['"]$/g,'');}});
+    return rawArrayItems(text).map(x=>{try{return JSON.parse(x.replace(/^'/,'"').replace(/'$/,'"'));}catch{return x.replace(/^['"]|['"]$/g,'');}});
   }
   function scanObjectScopes(code){
     const stack=[],scopes=[];let quote='',escaped=false,lineComment=false,blockComment=false;
@@ -446,7 +452,7 @@ const FolioEngine = (() => {
     return scopes.sort((a,b)=>(a.end-a.start)-(b.end-b.start));
   }
   function arrayProperty(code,scope,name,scopes){
-    const body=code.slice(scope.start+1,scope.end-1),re=new RegExp('\\b'+name+'\\b\\s*:\\s*\\[','g');let match;
+    const body=code.slice(scope.start+1,scope.end-1),re=new RegExp("[\"']?\\b"+name+"\\b[\"']?\\s*:\\s*\\[",'g');let match;
     while((match=re.exec(body))){const at=scope.start+1+match.index;if(scopes.some(child=>child!==scope&&child.start>scope.start&&child.end<scope.end&&at>child.start&&at<child.end))continue;
       const open=scope.start+1+match.index+match[0].lastIndexOf('[');let depth=1,quote='',escaped=false;
       for(let i=open+1;i<scope.end;i++){const ch=code[i];if(quote){if(escaped)escaped=false;else if(ch==='\\')escaped=true;else if(ch===quote)quote='';continue;}if(ch==='"'||ch==="'"){quote=ch;continue;}if(ch==='[')depth++;else if(ch===']'&&!--depth)return {open,close:i,inner:code.slice(open+1,i)};}
@@ -454,29 +460,30 @@ const FolioEngine = (() => {
     return null;
   }
   function directArrayProperties(code,scope,scopes){
-    const body=code.slice(scope.start+1,scope.end-1),re=/([\w$]+)\s*:\s*\[/g,result=[];let match;
+    const body=code.slice(scope.start+1,scope.end-1),re=/["']?([\w$]+)["']?\s*:\s*\[/g,result=[];let match;
     while((match=re.exec(body))){const at=scope.start+1+match.index;if(scopes.some(child=>child!==scope&&child.start>scope.start&&child.end<scope.end&&at>child.start&&at<child.end))continue;
       const array=arrayProperty(code,scope,match[1],scopes);if(array)result.push({name:match[1],...array});
     }
     return result;
   }
   function directTextProperty(code,scope,name,scopes){
-    const body=code.slice(scope.start+1,scope.end-1),re=new RegExp("\\b"+name+"\\b\\s*:\\s*([\"'])(.*?)\\1",'gi');let match;
+    const body=code.slice(scope.start+1,scope.end-1),re=new RegExp("[\"']?\\b"+name+"\\b[\"']?\\s*:\\s*([\"'])(.*?)\\1",'gi');let match;
     while((match=re.exec(body))){const at=scope.start+1+match.index;if(scopes.some(child=>child!==scope&&child.start>scope.start&&child.end<scope.end&&at>child.start&&at<child.end))continue;return match[2];}
     return '';
   }
   function directBooleanProperty(code,scope,name,scopes){
-    const body=code.slice(scope.start+1,scope.end-1),re=new RegExp('\\b'+name+'\\b\\s*:\\s*(?:true|false)','gi');let match;
+    const body=code.slice(scope.start+1,scope.end-1),re=new RegExp("[\"']?\\b"+name+"\\b[\"']?\\s*:\\s*(?:true|false)",'gi');let match;
     while((match=re.exec(body))){const at=scope.start+1+match.index;if(scopes.some(child=>child!==scope&&child.start>scope.start&&child.end<scope.end&&at>child.start&&at<child.end))continue;return true;}
     return false;
   }
-  function scopeKey(code,scope){const before=code.slice(Math.max(0,scope.start-100),scope.start);return before.match(/["']?([\w$]+)["']?\s*:\s*$/)?.[1]||'';}
+  function scopeKey(code,scope){const before=code.slice(Math.max(0,scope.start-180),scope.start),property=before.match(/["']?([\w$]+)["']?\s*:\s*$/);if(property)return property[1];const assignment=before.match(/(?:window\.)?chart(?:\.[\w$]+)*\.([\w$]+)\s*=\s*$|(?:const|let|var)\s+([\w$]+)\s*=\s*$/);return assignment?.[1]||assignment?.[2]||'';}
   function arrayLiteral(item,template,kind,period,sourceThai,language='en'){
     if(kind==='number')return String(item);
     const text=String(template??'');
-    if(isSubAnnual(period)){const buddhist=/(?:25\d{2}|26\d{2})/.test(text)||(!text&&sourceThai);const year=period.year+(buddhist?543:0);return JSON.stringify(formatPeriodLabel({...period,year},language));}
-    const year=period.year+(/(?:25|26)\d{2}/.test(text)||(!text&&sourceThai)?543:0);return !text||/^\s*\d{4}\s*$/.test(text)?String(year):JSON.stringify(String(year));
+    if(isSubAnnual(period)){const buddhist=/(?:25\d{2}|26\d{2})/.test(text)||(!text&&sourceThai);const year=period.year+(buddhist?543:0);let label=formatPeriodLabel({...period,year},language);if(/(?:Q|ไตรมาส|Quarter|\dQ)[^\d]*\d{2}\s*$/i.test(text))label=label.replace(/\d{4}$/,String(year).slice(-2));return quoteArrayString(label,text);}
+    const year=period.year+(/(?:25|26)\d{2}/.test(text)||(!text&&sourceThai)?543:0);return !text||/^\s*\d{4}\s*$/.test(text)?String(year):quoteArrayString(String(year),text);
   }
+  function quoteArrayString(value,template){const quote=String(template??'').trim().startsWith("'")?"'":'"';return quote+String(value).replace(/\\/g,'\\\\').replace(new RegExp(quote,'g'),'\\'+quote)+quote;}
   function formatArrayItems(items,original){
     const multiline=/\r?\n/.test(original);if(!multiline)return items.join(', ');
     const newline=original.includes('\r\n')?'\r\n':'\n';const firstLine=original.match(/\r?\n([\t ]*)\S/)?.[1]||'    ';
@@ -489,7 +496,7 @@ const FolioEngine = (() => {
     for(const scope of scopes){
       const periodArray=arrayProperty(code,scope,'period',scopes),dataArray=arrayProperty(code,scope,'dataset',scopes);
       if(!periodArray||!dataArray)continue;
-      const oldPeriodTokens=parseArray(periodArray.inner),oldPeriods=oldPeriodTokens.map(periodFrom);
+      const oldPeriodRaw=rawArrayItems(periodArray.inner),oldPeriodTokens=parseArray(periodArray.inner),oldPeriods=oldPeriodTokens.map(periodFrom);
       const sectionKey=scopeKey(code,scope),quarterly=/(?:quarter|quarterly|qoq)/i.test(sectionKey),yearly=/(?:yearly|annual)/i.test(sectionKey),periodicName=/(?:monthly|month|semiannual|halfyear|year.?to.?date|ytd)/i.test(sectionKey);
       if(!oldPeriods.some(Boolean)&&!quarterly&&!yearly&&!periodicName)continue;
       const parentScopes=scopes.filter(x=>x.start<scope.start&&x.end>scope.end).sort((a,b)=>(a.end-a.start)-(b.end-b.start));
@@ -518,9 +525,9 @@ const FolioEngine = (() => {
       for(const period of targetPeriods){
         const at=oldIndex.get(period.id),source=sourceFor(metric,scopeComparisonMetric,period,comparisonKind);
         const keepOld=at!==undefined&&!source;
-        if(keepOld){nextIds.push(period.id);nextPeriods.push(arrayLiteral(oldPeriodTokens[at],oldPeriodTokens[0], 'period',period,sourceThai,language));nextData.push(oldDataTokens[at]??'null');report.unmatched.push(`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook · คงค่าเดิมใน JavaScript ไว้`);}
-        else if(source){nextIds.push(period.id);nextPeriods.push(arrayLiteral(period.id,oldPeriodTokens[0],'period',period,sourceThai,language));nextData.push(source.value===null?emptyArrayValue(source,oldDataTokens[at],oldDataTokens[0]):String(Number(source.value.toPrecision?.(12)??source.value)));}
-        else if(at!==undefined){nextIds.push(period.id);nextPeriods.push(arrayLiteral(oldPeriodTokens[at],oldPeriodTokens[0],'period',period,sourceThai,language));nextData.push(oldDataTokens[at]??'null');report.unmatched.push(`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook · คงค่าเดิมไว้`);}
+        if(keepOld){nextIds.push(period.id);nextPeriods.push(oldPeriodRaw[at]||arrayLiteral(oldPeriodTokens[at],oldPeriodRaw[0], 'period',period,sourceThai,language));nextData.push(oldDataTokens[at]??'null');report.unmatched.push(`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook · คงค่าเดิมใน JavaScript ไว้`);}
+        else if(source){nextIds.push(period.id);nextPeriods.push(at!==undefined?oldPeriodRaw[at]:arrayLiteral(period.id,oldPeriodRaw[0],'period',period,sourceThai,language));nextData.push(source.value===null?emptyArrayValue(source,oldDataTokens[at],oldDataTokens[0]):String(Number(source.value.toPrecision?.(12)??source.value)));}
+        else if(at!==undefined){nextIds.push(period.id);nextPeriods.push(oldPeriodRaw[at]||arrayLiteral(oldPeriodTokens[at],oldPeriodRaw[0],'period',period,sourceThai,language));nextData.push(oldDataTokens[at]??'null');report.unmatched.push(`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook · คงค่าเดิมไว้`);}
         else report.unmatched.push(`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook และกราฟเดิม`);
       }
       const signature=scope.start+':'+dataArray.open;if(handled.has(signature))continue;handled.add(signature);
@@ -535,11 +542,11 @@ const FolioEngine = (() => {
           else aligned.push(at===undefined?'null':values[at]??'null');
         }
         patches.push({start:series.open+1,end:series.close,text:formatArrayItems(aligned,series.inner)});
-        report.changes.push({item:series.name,oldValue:'chart series',newValue:aligned.length+' aligned points',source:seriesMetric.sheet+' row '+seriesMetric.row});
+        report.changes.push({item:series.name,oldValue:values.join(', '),newValue:aligned.join(', '),source:seriesMetric.sheet+' row '+seriesMetric.row});
       }
       const chartScope=parentScopes.find(parent=>directBooleanProperty(code,parent,'QoQ',scopes)||directBooleanProperty(code,parent,'qoq',scopes));
       if(chartScope&&(!comparisonKind||comparisonKind==='qoq')){for(const key of ['QoQ','qoq']){const body=code.slice(chartScope.start+1,chartScope.end-1),re=new RegExp('('+key+'\\s*:\\s*)(true|false)','i'),match=re.exec(body);if(match){const at=chartScope.start+1+match.index+match[1].length;if(!scopes.some(child=>child!==chartScope&&child.start>chartScope.start&&child.end<chartScope.end&&at>child.start&&at<child.end)){const id=chartScope.start+':'+at;if(!qoqPatches.has(id)){patches.push({start:at,end:at+match[2].length,text:nextData.some(v=>numberFrom(v)!==null)?'true':'false'});qoqPatches.add(id);}break;}}}}
-      changed++;report.changes.push({item:labels[0]||metric.label,oldValue:'chart '+(isPeriodic?'periodic':'yearly')+' dataset',newValue:nextData.length+' points',source:metric.sheet+' row '+metric.row});
+      changed++;report.changes.push({item:metric.label+' chart '+(isPeriodic?'quarterly':'yearly')+' dataset',oldValue:oldDataTokens.join(', '),newValue:nextData.join(', '),source:metric.sheet+' row '+metric.row});
     }
     if(!changed&&code.trim()&&!report.unmatched.length)report.unmatched.push('ไม่พบ JavaScript chart source ที่มี period/dataset และชื่อ series เชื่อมกับแถวสรุปใน workbook');
     let output=code;for(const patch of patches.sort((a,b)=>b.start-a.start))output=output.slice(0,patch.start)+patch.text+output.slice(patch.end);
