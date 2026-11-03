@@ -549,16 +549,14 @@ const FolioEngine = (() => {
         const legend=arrayProperty(code,parent,'legend',scopes);if(legend)for(const value of parseArray(legend.inner))if(typeof value==='string'&&value.trim())legendLabels.push(value.trim());
         const objectKey=scopeKey(code,parent);if(objectKey)labels.push(objectKey);
       }
-      const chartLabels=[...new Set([...legendLabels.slice(0,1),...labels])];
+      const chartLabels=legendLabels.length?legendLabels:labels;
       const comparisonKind=comparisonType(sectionKey)||chartLabels.map(comparisonType).find(Boolean)||'';
-      const metricMatches=chartLabels.map(label=>findMetric(summary.metrics,label,'summary',selected)).filter(Boolean);
-      const uniqueMetricMatches=[...new Map(metricMatches.map(item=>[[item.bookName,item.sheetName,item.row].join('|'),item])).values()];
-      let metric=uniqueMetricMatches.length===1?uniqueMetricMatches[0]:null;
+      let metric=null;for(const label of chartLabels){metric=findMetric(summary.metrics,label,'summary',selected);if(metric)break;}
       const oldDataRaw=rawArrayItems(dataArray.inner),oldDataTokens=parseArray(dataArray.inner),oldIndex=new Map();oldPeriods.forEach((period,index)=>{if(period)oldIndex.set(period.id,index);});
       const seriesProperties=directArrayProperties(code,scope,scopes).filter(series=>series.name!=='period'&&series.name!=='dataset'&&!/markPoint|axis|annotation|color|symbol|label/i.test(series.name));
       const seriesCandidates=seriesProperties.map(series=>{const type=comparisonType(series.name),comparisonMetric=type?findComparisonMetric(summary.metrics,(metric?.label||labels[0]||comparisonBase(series.name)),type,'summary',selected):null,seriesMetric=findMetric(summary.metrics,type?comparisonBase(series.name):series.name,'summary',selected)||(type?metric:null);return {series,type,values:parseArray(series.inner),rawValues:rawArrayItems(series.inner),metric:seriesMetric,comparisonMetric};});
-      if(!metric&&!uniqueMetricMatches.length&&!legendLabels.length)metric=seriesCandidates.find(candidate=>candidate.metric)?.metric||null;
-      if(!metric){const identity=legendLabels[0]||labels[0]||'ไม่มีชื่อ';report.unmatched.push(uniqueMetricMatches.length>1?'legend และชื่อ key ของกราฟจับคู่ไปคนละแถวใน workbook · คง JavaScript เดิมไว้':'ไม่พบแถวสรุปใน workbook ที่ตรงกับ legend/ชื่อกราฟ '+identity+' · คง JavaScript เดิมไว้');continue;}
+      if(!metric&&!legendLabels.length)metric=seriesCandidates.find(candidate=>candidate.metric)?.metric||null;
+      if(!metric){report.unmatched.push('ไม่พบแถวสรุปใน workbook ที่ตรงกับกราฟ '+(legendLabels[0]||labels[0]||'ไม่มีชื่อ'));continue;}
       const scopeComparisonMetric=comparisonKind&&comparisonType(metric.label)!==comparisonKind?findComparisonMetric(summary.metrics,metric.label,comparisonKind,'summary',selected):null;
       const matchedSeries=seriesCandidates.map(candidate=>{const type=candidate.type;return {...candidate,metric:candidate.metric||(type?metric:null),comparisonMetric:candidate.comparisonMetric||(type?findComparisonMetric(summary.metrics,metric.label,type,'summary',selected):null)}}).filter(({values,metric:seriesMetric})=>seriesMetric&&values.length===oldPeriodTokens.length&&values.every(value=>value===null||numberFrom(value)!==null||typeof value==='string'&&(!value.trim()||/^[-–—]$/.test(value))));
       const sourceFor=(sourceMetric,comparisonMetric,period,type='')=>{if(!sourceMetric)return null;if(!type)return sourceMetric.values[period.id]||null;return sourceMetric.comparisons?.[period.id+':'+type]||(comparisonType(sourceMetric.label)===type?sourceMetric.values[period.id]:null)||(comparisonMetric&&comparisonType(comparisonMetric.label)===type?comparisonMetric.values[period.id]:null)||(findComparisonMetric(summary.metrics,sourceMetric.label,type,'summary',selected)?.values[period.id]||null)||null;};
