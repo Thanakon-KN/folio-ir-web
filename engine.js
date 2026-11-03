@@ -498,6 +498,21 @@ const FolioEngine = (() => {
     if(!items.length)return '';
     return newline+firstLine+items.join(','+newline+firstLine)+newline;
   }
+  function updateArrayItems(items,original){
+    const oldItems=rawArrayItems(original);if(oldItems.length!==items.length)return formatArrayItems(items,original);
+    let output='',start=0,index=0,quote='',escaped=false,depth=0;
+    for(let i=0;i<original.length;i++){
+      const ch=original[i];if(quote){if(escaped)escaped=false;else if(ch==='\\')escaped=true;else if(ch===quote)quote='';continue;}
+      if(ch==='"'||ch==="'"){quote=ch;continue;}if(ch==='['||ch==='{')depth++;else if(ch===']'||ch==='}')depth=Math.max(0,depth-1);
+      if(ch===','&&depth===0){const segment=original.slice(start,i),trimmed=segment.trim(),leading=segment.match(/^\s*/)?.[0]||'',trailing=segment.match(/\s*$/)?.[0]||'';output+=(items[index]===trimmed?segment:leading+items[index]+trailing)+',';start=i+1;index++;}
+    }
+    const segment=original.slice(start),trimmed=segment.trim(),leading=segment.match(/^\s*/)?.[0]||'',trailing=segment.match(/\s*$/)?.[0]||'';
+    return output+(items[index]===trimmed?segment:leading+(items[index]??trimmed)+trailing);
+  }
+  function financialArrayNumber(value,previous){
+    const prior=String(previous??'').trim();if(numberFrom(prior)===value)return prior;
+    const decimals=decimalPlaces(prior);return decimals?Number(value).toFixed(decimals):String(Number(value.toPrecision?.(12)??value));
+  }
   function updateFinancialJs(code,summary,selected,mode,report,language='en'){
     const scopes=scanObjectScopes(code),patches=[],handled=new Set(),qoqPatches=new Set();let changed=0;
     const sourceThai=/[\u0E00-\u0E7F]/.test(code);
@@ -530,13 +545,13 @@ const FolioEngine = (() => {
           const aligned=[];
           for(const period of targetPeriods){
             const at=oldIndex.get(period.id),source=metric.values[period.id];
-            if(source){aligned.push(source.value===null?emptyArrayValue(source,values[at],values[0]):String(Number(source.value.toPrecision?.(12)??source.value)));}
+            if(source){aligned.push(source.value===null?emptyArrayValue(source,values[at],values[0]):financialArrayNumber(source.value,values[at]));}
             else if(at!==undefined){aligned.push(values[at]??'null');report.unmatched.push(`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook · คงค่าเดิมใน JavaScript ไว้`);}
             else{aligned.push('null');report.unmatched.push(`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook และกราฟเดิม`);}
           }
           updates.set(series.name,{series,metric,values:aligned});
-          patches.push({start:series.open+1,end:series.close,text:formatArrayItems(aligned,series.inner)});
-          report.changes.push({item:series.name,oldValue:values.join(', '),newValue:aligned.join(', '),source:metric.sheet+' row '+metric.row});
+          const updated=updateArrayItems(aligned,series.inner);
+          if(updated!==series.inner){patches.push({start:series.open+1,end:series.close,text:updated});report.changes.push({item:series.name,oldValue:values.join(', '),newValue:aligned.join(', '),source:metric.sheet+' row '+metric.row});}
         }
         // `total` is the stacked sum used by this chart. If the workbook does
         // not provide a separate total row, derive it from the three named
@@ -549,12 +564,13 @@ const FolioEngine = (() => {
               const items=components.map(component=>numberFrom(component.values[index]));
               return items.every(value=>value!==null)?String(Number(items.reduce((sum,value)=>sum+value,0).toPrecision(12))):'null';
             });
-            patches.push({start:total.open+1,end:total.close,text:formatArrayItems(values,total.inner)});
-            report.changes.push({item:'total',oldValue:parseArray(total.inner).join(', '),newValue:values.join(', '),source:'คำนวณจาก totalAssets + totalLiabilities + totalShareholderEquity'});
+            const updated=updateArrayItems(values,total.inner);
+            if(updated!==total.inner){patches.push({start:total.open+1,end:total.close,text:updated});report.changes.push({item:'total',oldValue:parseArray(total.inner).join(', '),newValue:values.join(', '),source:'คำนวณจาก totalAssets + totalLiabilities + totalShareholderEquity'});}
           }
         }
         if(updates.size){
-          patches.push({start:periodArray.open+1,end:periodArray.close,text:formatArrayItems(targetPeriods.map((period,index)=>{const at=oldIndex.get(period.id);return at!==undefined?oldPeriodRaw[at]:arrayLiteral(period.id,oldPeriodRaw[0]||shortPeriodTemplate,'period',period,sourceThai,language);}),periodArray.inner)});
+          const periodItems=targetPeriods.map((period,index)=>{const at=oldIndex.get(period.id);return at!==undefined?oldPeriodRaw[at]:arrayLiteral(period.id,oldPeriodRaw[0]||shortPeriodTemplate,'period',period,sourceThai,language);}),updatedPeriods=updateArrayItems(periodItems,periodArray.inner);
+          if(updatedPeriods!==periodArray.inner)patches.push({start:periodArray.open+1,end:periodArray.close,text:updatedPeriods});
           changed+=updates.size;
         }
         continue;
@@ -567,9 +583,9 @@ const FolioEngine = (() => {
       }
       const comparisonKind=comparisonType(sectionKey)||labels.map(comparisonType).find(Boolean)||'';
       let metric=null;for(const label of labels){metric=findMetric(summary.metrics,label,'summary',selected);if(metric)break;}
-      const oldDataTokens=parseArray(dataArray.inner),oldIndex=new Map();oldPeriods.forEach((period,index)=>{if(period)oldIndex.set(period.id,index);});
+      const oldDataRaw=rawArrayItems(dataArray.inner),oldDataTokens=parseArray(dataArray.inner),oldIndex=new Map();oldPeriods.forEach((period,index)=>{if(period)oldIndex.set(period.id,index);});
       const seriesProperties=directArrayProperties(code,scope,scopes).filter(series=>series.name!=='period'&&series.name!=='dataset'&&!/markPoint|axis|annotation|color|symbol|label/i.test(series.name));
-      const seriesCandidates=seriesProperties.map(series=>{const type=comparisonType(series.name),comparisonMetric=type?findComparisonMetric(summary.metrics,(metric?.label||labels[0]||comparisonBase(series.name)),type,'summary',selected):null,seriesMetric=findMetric(summary.metrics,type?comparisonBase(series.name):series.name,'summary',selected)||(type?metric:null);return {series,type,values:parseArray(series.inner),metric:seriesMetric,comparisonMetric};});
+      const seriesCandidates=seriesProperties.map(series=>{const type=comparisonType(series.name),comparisonMetric=type?findComparisonMetric(summary.metrics,(metric?.label||labels[0]||comparisonBase(series.name)),type,'summary',selected):null,seriesMetric=findMetric(summary.metrics,type?comparisonBase(series.name):series.name,'summary',selected)||(type?metric:null);return {series,type,values:parseArray(series.inner),rawValues:rawArrayItems(series.inner),metric:seriesMetric,comparisonMetric};});
       if(!metric)metric=seriesCandidates.find(candidate=>candidate.metric)?.metric||null;
       if(!metric){report.unmatched.push('ไม่พบแถวสรุปใน workbook ที่ตรงกับกราฟ '+(labels[0]||'ไม่มีชื่อ'));continue;}
       const scopeComparisonMetric=comparisonKind&&comparisonType(metric.label)!==comparisonKind?findComparisonMetric(summary.metrics,metric.label,comparisonKind,'summary',selected):null;
@@ -582,22 +598,25 @@ const FolioEngine = (() => {
       // existing points from matching workbook periods instead of skipping them.
       const targetPeriods=selectedTargetPeriods.length?selectedTargetPeriods:uniquePeriods(oldPeriods.filter(Boolean));
       const nextIds=[],nextPeriods=[],nextData=[];
+      changed++;
       for(const period of targetPeriods){
         const at=oldIndex.get(period.id),source=sourceFor(metric,scopeComparisonMetric,period,comparisonKind);
         const keepOld=at!==undefined&&!source;
-        if(keepOld){nextIds.push(period.id);nextPeriods.push(oldPeriodRaw[at]||arrayLiteral(oldPeriodTokens[at],oldPeriodRaw[0]||shortPeriodTemplate, 'period',period,sourceThai,language));nextData.push(oldDataTokens[at]??'null');report.unmatched.push(`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook · คงค่าเดิมใน JavaScript ไว้`);}
-        else if(source){nextIds.push(period.id);nextPeriods.push(at!==undefined?oldPeriodRaw[at]:arrayLiteral(period.id,oldPeriodRaw[0]||shortPeriodTemplate,'period',period,sourceThai,language));nextData.push(source.value===null?emptyArrayValue(source,oldDataTokens[at],oldDataTokens[0]):String(Number(source.value.toPrecision?.(12)??source.value)));}
-        else if(at!==undefined){nextIds.push(period.id);nextPeriods.push(oldPeriodRaw[at]||arrayLiteral(oldPeriodTokens[at],oldPeriodRaw[0]||shortPeriodTemplate,'period',period,sourceThai,language));nextData.push(oldDataTokens[at]??'null');report.unmatched.push(`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook · คงค่าเดิมไว้`);}
+        if(keepOld){nextIds.push(period.id);nextPeriods.push(oldPeriodRaw[at]||arrayLiteral(oldPeriodTokens[at],oldPeriodRaw[0]||shortPeriodTemplate, 'period',period,sourceThai,language));nextData.push(oldDataRaw[at]??'null');report.unmatched.push(`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook · คงค่าเดิมใน JavaScript ไว้`);}
+        else if(source){nextIds.push(period.id);nextPeriods.push(at!==undefined?oldPeriodRaw[at]:arrayLiteral(period.id,oldPeriodRaw[0]||shortPeriodTemplate,'period',period,sourceThai,language));nextData.push(source.value===null?emptyArrayValue(source,oldDataRaw[at],oldDataRaw[0]):financialArrayNumber(source.value,oldDataRaw[at]));}
+        else if(at!==undefined){nextIds.push(period.id);nextPeriods.push(oldPeriodRaw[at]||arrayLiteral(oldPeriodTokens[at],oldPeriodRaw[0]||shortPeriodTemplate,'period',period,sourceThai,language));nextData.push(oldDataRaw[at]??'null');report.unmatched.push(`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook · คงค่าเดิมไว้`);}
         else report.unmatched.push(`${metric.label} ไม่มีค่า ${formatPeriodLabel(period,language)} ใน workbook และกราฟเดิม`);
       }
       const signature=scope.start+':'+dataArray.open;if(handled.has(signature))continue;handled.add(signature);
-      patches.push({start:periodArray.open+1,end:periodArray.close,text:formatArrayItems(nextPeriods,periodArray.inner)});
-      patches.push({start:dataArray.open+1,end:dataArray.close,text:formatArrayItems(nextData,dataArray.inner)});
+      const updatedPeriods=updateArrayItems(nextPeriods,periodArray.inner),updatedData=updateArrayItems(nextData,dataArray.inner),chartValuesChanged=updatedPeriods!==periodArray.inner||updatedData!==dataArray.inner;
+      if(updatedPeriods!==periodArray.inner)patches.push({start:periodArray.open+1,end:periodArray.close,text:updatedPeriods});
+      if(updatedData!==dataArray.inner)patches.push({start:dataArray.open+1,end:dataArray.close,text:updatedData});
+      if(chartValuesChanged)report.changes.push({item:metric.label+' chart '+(isPeriodic?'quarterly':'yearly')+' dataset',oldValue:oldDataRaw.join(', '),newValue:nextData.join(', '),source:metric.sheet+' row '+metric.row});
       // Growth labels in markPointData are derived from the plotted values.
       // Refresh their percentage when the chart contains a matching prior-year
       // point, keeping the original label, quote style, and decimal precision.
       const markPoints=arrayProperty(code,scope,'markPointData',scopes);
-      if(markPoints){
+      if(markPoints&&chartValuesChanged){
         const values=nextData.map(numberFrom),latest=targetPeriods.reduce((best,period)=>!best||period.year>best.year||period.year===best.year&&periodOrder(period)>periodOrder(best)?period:best,null);
         const latestIndex=targetPeriods.findIndex(period=>period.id===latest?.id);
         const priorIndex=latest?targetPeriods.findIndex(period=>period.year===latest.year-1&&period.quarter===latest.quarter&&period.months===latest.months&&period.halfYear===latest.halfYear):-1;
@@ -619,20 +638,19 @@ const FolioEngine = (() => {
           }
         }
       }
-      for(const {series,type,values,metric:seriesMetric,comparisonMetric} of matchedSeries){
+      for(const {series,type,values,rawValues,metric:seriesMetric,comparisonMetric} of matchedSeries){
         const aligned=[];for(const period of targetPeriods){
           if(!nextIds.includes(period.id))continue;
           const at=oldIndex.get(period.id),source=sourceFor(seriesMetric,comparisonMetric,period,type);
-          if(at!==undefined&&!source)aligned.push(values[at]??'null');
-          else if(source)aligned.push(source.value===null?emptyArrayValue(source,values[at],values[0]):String(Number(source.value.toPrecision?.(12)??source.value)));
-          else aligned.push(at===undefined?'null':values[at]??'null');
+          if(at!==undefined&&!source)aligned.push(rawValues[at]??'null');
+          else if(source)aligned.push(source.value===null?emptyArrayValue(source,rawValues[at],rawValues[0]):financialArrayNumber(source.value,rawValues[at]));
+          else aligned.push(at===undefined?'null':rawValues[at]??'null');
         }
-        patches.push({start:series.open+1,end:series.close,text:formatArrayItems(aligned,series.inner)});
-        report.changes.push({item:series.name,oldValue:values.join(', '),newValue:aligned.join(', '),source:seriesMetric.sheet+' row '+seriesMetric.row});
+        const updated=updateArrayItems(aligned,series.inner);
+        if(updated!==series.inner){patches.push({start:series.open+1,end:series.close,text:updated});report.changes.push({item:series.name,oldValue:rawValues.join(', '),newValue:aligned.join(', '),source:seriesMetric.sheet+' row '+seriesMetric.row});}
       }
       const chartScope=parentScopes.find(parent=>directBooleanProperty(code,parent,'QoQ',scopes)||directBooleanProperty(code,parent,'qoq',scopes));
       if(chartScope&&(!comparisonKind||comparisonKind==='qoq')){for(const key of ['QoQ','qoq']){const body=code.slice(chartScope.start+1,chartScope.end-1),re=new RegExp('('+key+'\\s*:\\s*)(true|false)','i'),match=re.exec(body);if(match){const at=chartScope.start+1+match.index+match[1].length;if(!scopes.some(child=>child!==chartScope&&child.start>chartScope.start&&child.end<chartScope.end&&at>child.start&&at<child.end)){const id=chartScope.start+':'+at;if(!qoqPatches.has(id)){patches.push({start:at,end:at+match[2].length,text:nextData.some(v=>numberFrom(v)!==null)?'true':'false'});qoqPatches.add(id);}break;}}}}
-      changed++;report.changes.push({item:metric.label+' chart '+(isPeriodic?'quarterly':'yearly')+' dataset',oldValue:oldDataTokens.join(', '),newValue:nextData.join(', '),source:metric.sheet+' row '+metric.row});
     }
     if(!changed&&code.trim()&&!report.unmatched.length)report.unmatched.push('ไม่พบ JavaScript chart source ที่มี period/dataset และชื่อ series เชื่อมกับแถวสรุปใน workbook');
     let output=code;for(const patch of patches.sort((a,b)=>b.start-a.start))output=output.slice(0,patch.start)+patch.text+output.slice(patch.end);
