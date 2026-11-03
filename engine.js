@@ -278,19 +278,6 @@ const FolioEngine = (() => {
   function replaceRowCells(row,newCells){
     let raw=row.raw;for(let i=row.cells.length-1;i>=0;i--){const c=row.cells[i];raw=raw.slice(0,c.start)+raw.slice(c.end);}const close=raw.lastIndexOf('</tr>');return close<0?row.raw:raw.slice(0,close)+newCells.join('')+raw.slice(close);
   }
-  function updateFinancialTitle(html,selected,report){
-    const latest=[...selected].sort((a,b)=>a.year-b.year||a.quarter-b.quarter).at(-1);if(!latest)return html;
-    return html.replace(/<(h[1-6])\b([^>]*)>([\s\S]*?)<\/\1>/gi,(whole,tag,attrs,inner)=>{
-      const title=plainText(inner);if(!/(?:financial\s+highlights?|ข้อมูลสำคัญทางการเงิน|สรุปข้อมูลทางการเงิน)/i.test(title))return whole;
-      const years=[...title.matchAll(/\b((?:19|20|25|26)\d{2})\b/g)];if(!years.length)return whole;
-      const last=years.at(-1),oldYear=Number(last[1]),newYear=oldYear>=2400?latest.year+543:latest.year;
-      if(oldYear===newYear)return whole;
-      const offset=inner.lastIndexOf(last[1]);if(offset<0)return whole;
-      const nextInner=inner.slice(0,offset)+newYear+inner.slice(offset+last[1].length);
-      report.changes.push({item:title,oldValue:last[1],newValue:String(newYear),source:'งวดล่าสุดที่เลือก · '+latest.label});
-      return '<'+tag+attrs+'>'+nextInner+'</'+tag+'>';
-    });
-  }
   function updateFinancialHtml(html,summary,selected,mode,language,report){
     const tables=[...html.matchAll(/<table\b[\s\S]*?<\/table>/gi)];let changed=false,matched=false;
     let updated=html.replace(/<table\b[\s\S]*?<\/table>/gi,table=>{
@@ -329,9 +316,8 @@ const FolioEngine = (() => {
       return tableRows.map((row,i)=>({row,i})).sort((a,b)=>b.row.start-a.row.start).reduce((result,item)=>result.slice(0,item.row.start)+item.row.raw+result.slice(item.row.end),table);
     });
     const beforeComponents=report.changes.length;updated=updateFinancialComponents(updated,summary,selected,language,report);const componentChanged=report.changes.length>beforeComponents;
-    const beforeTitle=report.changes.length;updated=updateFinancialTitle(updated,selected,report);const titleChanged=report.changes.length>beforeTitle;
-    if(!matched&&tables.length&&!titleChanged)report.unmatched.push('ไม่พบตาราง HTML ที่มีหัวงวดและชื่อรายการตรงกับแถวใน workbook');else if(matched&&!changed)report.notes.push('ตารางมีรายการตรงกับ workbook แต่ค่าที่เลือกไม่ทำให้โค้ดเปลี่ยนแปลง');
-    if(tables.length===0&&!componentChanged&&!titleChanged)report.unmatched.push('ไม่พบ <table> หรือ counter-number ที่เชื่อมกับรายการใน workbook');
+    if(!matched&&tables.length)report.unmatched.push('ไม่พบตาราง HTML ที่มีหัวงวดและชื่อรายการตรงกับแถวใน workbook');else if(matched&&!changed)report.notes.push('ตารางมีรายการตรงกับ workbook แต่ค่าที่เลือกไม่ทำให้โค้ดเปลี่ยนแปลง');
+    if(tables.length===0&&!componentChanged)report.unmatched.push('ไม่พบ <table> หรือ counter-number ที่เชื่อมกับรายการใน workbook');
     return updated;
   }
   function updateFinancialComponents(html,summary,selected,language,report){
