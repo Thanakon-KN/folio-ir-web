@@ -21,10 +21,10 @@
   function updateButtons(){
     $('#inspect-files').disabled=!readyToInspect();$('#run-update').disabled=!readyToUpdate();$('#cancel-update').hidden=true;
     $('#display-selection').hidden=!ui.inspection||isShareholder();$('#display-selection').disabled=!ui.inspection;
-    $('#update-language').hidden=isShareholder();$('#update-language').disabled=isShareholder();
+    $('#update-language').hidden=!ui.inspection;$('#update-language').disabled=!ui.inspection;$('#update-language .hint').textContent=isShareholder()?'เลือกภาษาเพื่ออัปเดตเฉพาะเนื้อหา HTML และป้ายชื่อกราฟของภาษานั้น':'เลือกแถว HTML ตามภาษา · กราฟ JavaScript ยังคงอัปเดตตามข้อมูลที่เลือก';
     $('#update-mode').hidden=!ui.inspection||isShareholder();$('#update-mode').disabled=!ui.inspection;
     $('#inspect-help').textContent=ui.inspectBusy?'กำลังอ่านไฟล์ในเบราว์เซอร์…':!hasCode()?'วาง HTML/Vue หรือ JavaScript ก่อนตรวจไฟล์':!ui.files.length?'เลือกไฟล์ข้อมูลต้นทางก่อนตรวจไฟล์':fileProblem()||'พร้อมตรวจข้อมูลในเครื่อง · หากแก้ไฟล์หรือโค้ด ต้องตรวจใหม่';
-    $('#run-help').textContent=ui.busy?'กำลังสร้างโค้ดด้วยกฎที่กำหนดไว้…':!ui.inspection?'ตรวจไฟล์ก่อนดำเนินการ':isShareholder()?'พร้อมอัปเดตตามส่วนของผู้ถือหุ้นที่จับคู่ได้':'เลือกงวดและวิธีอัปเดตก่อนสร้างผลลัพธ์';
+    $('#run-help').textContent=ui.busy?'กำลังสร้างโค้ดด้วยกฎที่กำหนดไว้…':!ui.inspection?'ตรวจไฟล์ก่อนดำเนินการ':isShareholder()?'พร้อมอัปเดตภาษา'+(targetLanguage()==='th'?'ไทย':'อังกฤษ')+'ตามส่วนของผู้ถือหุ้นที่จับคู่ได้':'เลือกงวดและวิธีอัปเดตก่อนสร้างผลลัพธ์';
     renderGuide();
   }
   function renderGuide(){
@@ -110,7 +110,7 @@
     requestAnimationFrame(()=>{target.scrollIntoView({behavior:'smooth',block:'center'});const firstIssue=$('#code-issue-list .code-issue-item');if(firstIssue)firstIssue.focus({preventScroll:true});else $('#report-result').focus({preventScroll:true});});
   }
   function jumpToUpdateReport(){const reportCard=$('.report-collapsible');if(reportCard)reportCard.open=true;requestAnimationFrame(()=>{$('#report-result').scrollIntoView({behavior:'smooth',block:'center'});$('#report-result').focus({preventScroll:true});});}
-  function run(){if(!readyToUpdate())return;ui.busy=true;updateButtons();try{const payload={html:$('#html-code').value,javascript:$('#javascript-code').value};const result=isShareholder()?FolioEngine.updateShareholders(payload,ui.inspection):FolioEngine.updateFinancial(payload,ui.inspection,selected(),mode(),targetLanguage());renderResult(result);}catch(error){msg(error.message||'สร้างผลลัพธ์ไม่สำเร็จ','error');}finally{ui.busy=false;updateButtons();}}
+  function run(){if(!readyToUpdate())return;ui.busy=true;updateButtons();try{const payload={html:$('#html-code').value,javascript:$('#javascript-code').value};const result=isShareholder()?FolioEngine.updateShareholders(payload,ui.inspection,targetLanguage()):FolioEngine.updateFinancial(payload,ui.inspection,selected(),mode(),targetLanguage());renderResult(result);}catch(error){msg(error.message||'สร้างผลลัพธ์ไม่สำเร็จ','error');}finally{ui.busy=false;updateButtons();}}
   function saveDraft(){try{localStorage.setItem(key(),JSON.stringify({html:$('#html-code').value,javascript:$('#javascript-code').value,request:$('#request').value}));}catch{}}
   function loadDraft(){try{const draft=JSON.parse(localStorage.getItem(key())||'{}');$('#html-code').value=draft.html||'';$('#javascript-code').value=draft.javascript||'';$('#request').value=draft.request||'';}catch{}}
   function language(){const text=$('#html-code').value+' '+$('#javascript-code').value;const thai=(text.match(/[\u0E00-\u0E7F]/g)||[]).length;$('#language-detected').textContent=!text.trim()?'ภาษา: รออ่านจากโค้ด':thai?'มีข้อความภาษาไทย · คงข้อความแต่ละภาษาตามต้นฉบับ':'ภาษา: English';$('#html-char-count').textContent=$('#html-code').value.length.toLocaleString();$('#javascript-char-count').textContent=$('#javascript-code').value.length.toLocaleString();}
