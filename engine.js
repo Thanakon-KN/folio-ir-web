@@ -227,15 +227,25 @@ const FolioEngine = (() => {
     const rules=[
       ['rightsType',/^(rightstype|typeofrights|typeofshare|ประเภทสิทธิ|สิทธิประโยชน์)$/i,'overview'],
       ['overviewDate',/^(overviewdate|asofdate|asof|asat|asatdate|dateasof|shareholdersasof|shareholdersasofdate|dateofshareholders|dateofshareholderinformation|วันที่ข้อมูล|ข้อมูลณวันที่|ณวันที่|วันที่ปิดสมุดทะเบียน)$/i,'overview'],
-      ['totalShareholders',/^(totalshareholders|totalnumberofshareholders|numberofshareholders|numberoftotalshareholders|ผู้ถือหุ้นทั้งหมด|จำนวนผู้ถือหุ้น)$/i,'overview'],
+      ['totalShareholders',/^(totalshareholders|totalnumberofshareholders|numberofshareholders|numberoftotalshareholders|ผู้ถือหุ้นทั้งหมด|จำนวนผู้ถือหุ้น|จำนวนผู้ถือหุ้นทั้งหมด)$/i,'overview'],
       ['scripless',/^(scripless|scriplessholding|scriplessshares|ระบบไร้ใบหุ้น|ถือครองผ่านระบบไร้ใบหุ้น)$/i,'overview'],
       ['freeFloatDate',/^(freefloatdate|freefloatasof|minoritydate|minorityasof|dateoffreefloat|dateoffreefloatinformation|วันที่ผู้ถือหุ้นรายย่อย|วันที่ข้อมูลfreefloat|วันที่ข้อมูลผู้ถือหุ้นรายย่อย)$/i,'free-float'],
       ['minorShareholders',/^(minorshareholders|numberofminorshareholders|numberofminorityshareholders|ผู้ถือหุ้นรายย่อย|จำนวนผู้ถือหุ้นรายย่อย)$/i,'free-float'],
       ['freeFloatPercent',/^(freefloat|freefloatpercent|freefloatpercentage|freefloatpercentofshares|freefloatpercentageofshares|สัดส่วนผู้ถือหุ้นรายย่อย|ร้อยละผู้ถือหุ้นรายย่อย)$/i,'free-float']
     ];
-    const facts={};for(const book of workbook.books)for(const sheet of book.sheets)for(const row of sheet.rows)for(const cell of row.cells){
-      const key=normalize(cell.text);for(const [id,re,section] of rules){if(!re.test(key))continue;const sameRow=row.cells.filter(c=>c.col>cell.col&&c.text).sort((a,b)=>a.col-b.col),nextRow=sheet.rows.find(r=>r.row===row.row+1),below=nextRow?.cells.find(c=>c.col===cell.col&&c.text),numericFact=['totalShareholders','scripless','minorShareholders','freeFloatPercent'].includes(id),dateFact=['overviewDate','freeFloatDate'].includes(id),numericValue=c=>numberFrom(c?.raw)!==null||numberFrom(c?.text)!==null||/^[-–—]$/.test(c?.text||''),dateValue=c=>parseSourceDate(c?.text,c?.format,c?.raw)!==null,value=numericFact?(sameRow.find(numericValue)||(numericValue(below)?below:null)):dateFact?(sameRow.find(dateValue)||(dateValue(below)?below:null)):(sameRow[0]||below);if(!value)continue;const candidate={value:value.text,raw:value.raw,formula:value.formula||'',format:value.format||'',source:`${book.name} / ${sheet.name} / ${cell.address}:${value.address}`,sheet:sheet.name,section,preferred:section==='free-float'?/free\s*float|minor|รายย่อย/i.test(sheet.name):/overview|ภาพรวม/i.test(sheet.name)};if(!facts[id]||(!facts[id].preferred&&candidate.preferred))facts[id]=candidate;else if(facts[id].preferred===candidate.preferred&&normalize(facts[id].value)!==normalize(candidate.value)){facts[id].ambiguous=true;facts[id].alternatives||=[facts[id].source];facts[id].alternatives.push(candidate.source);}}
-    }return facts;
+    const facts={},ruleFor=value=>rules.find(([,re])=>re.test(normalize(value))),numericIds=new Set(['totalShareholders','scripless','minorShareholders','freeFloatPercent']),dateIds=new Set(['overviewDate','freeFloatDate']);
+    for(const book of workbook.books)for(const sheet of book.sheets)for(const row of sheet.rows)for(const cell of row.cells){
+      const matched=ruleFor(cell.text);if(!matched)continue;const [id,,section]=matched,numericFact=numericIds.has(id),dateFact=dateIds.has(id);
+      const isValue=c=>{if(!c?.text||ruleFor(c.text))return false;if(numericFact)return numberFrom(c.raw)!==null||numberFrom(c.text)!==null||/^[-–—]$/.test(c.text);if(dateFact)return parseSourceDate(c.text,c.format,c.raw)!==null;return true;};
+      const sameRow=row.cells.filter(c=>c.col>cell.col&&c.text).sort((a,b)=>a.col-b.col);let value=null,labelEnd=cell.col;
+      for(const candidate of sameRow){const nextLabel=ruleFor(candidate.text);if(nextLabel){if(nextLabel[0]===id){labelEnd=candidate.col;continue;}break;}if(candidate.col<=labelEnd)continue;if(isValue(candidate))value=candidate;break;}
+      if(!value){const nextRow=sheet.rows.find(r=>r.row===row.row+1);const labelCols=[cell.col,...sameRow.filter(c=>ruleFor(c.text)?.[0]===id).map(c=>c.col)];for(const col of labelCols){const below=nextRow?.cells.find(c=>c.col===col&&c.text);if(isValue(below)){value=below;break;}}}
+      if(!value)continue;
+      const candidate={value:value.text,raw:value.raw,formula:value.formula||'',format:value.format||'',source:`${book.name} / ${sheet.name} / ${cell.address}:${value.address}`,sheet:sheet.name,section,preferred:section==='free-float'?/free\s*float|minor|รายย่อย/i.test(sheet.name):/overview|ภาพรวม/i.test(sheet.name)};
+      if(!facts[id]||(!facts[id].preferred&&candidate.preferred))facts[id]=candidate;
+      else if(facts[id].preferred===candidate.preferred&&normalize(facts[id].value)!==normalize(candidate.value)){facts[id].ambiguous=true;facts[id].alternatives||=[facts[id].source];facts[id].alternatives.push(candidate.source);}
+    }
+    return facts;
   }
   function extractShareholderRows(workbook){
     const rows=[];
@@ -734,7 +744,7 @@ const FolioEngine = (() => {
     const factRules={
       rightsType:{labels:['Rights Type','Type of rights','Type of share','ประเภทสิทธิ','สิทธิประโยชน์'],format:'text'},
       overviewDate:{labels:['Overview Date','As of date','As of','Shareholders as of','Shareholders as of date','Date of Shareholders','วันที่ข้อมูล','ข้อมูล ณ วันที่','ณ วันที่','วันที่ปิดสมุดทะเบียน'],format:'date'},
-      totalShareholders:{labels:['Total Shareholders','Total Number of Shareholders','Number of Shareholders','ผู้ถือหุ้นทั้งหมด','จำนวนผู้ถือหุ้น'],format:'number'},
+      totalShareholders:{labels:['Total Shareholders','Total Number of Shareholders','Number of Shareholders','ผู้ถือหุ้นทั้งหมด','จำนวนผู้ถือหุ้น','จำนวนผู้ถือหุ้นทั้งหมด'],format:'number'},
       scripless:{labels:['Scripless','Scripless Holding','Scripless Shares','ระบบไร้ใบหุ้น','ถือครองผ่านระบบไร้ใบหุ้น'],format:'number'},
       freeFloatDate:{labels:['Free Float Date','Free Float as of','Minority Date','Date of Free Float','วันที่ผู้ถือหุ้นรายย่อย','วันที่ข้อมูล Free Float','วันที่ข้อมูลผู้ถือหุ้นรายย่อย'],format:'date'},
       minorShareholders:{labels:['Minor Shareholders','Number of Minor Shareholders','Number of Minority Shareholders','ผู้ถือหุ้นรายย่อย','จำนวนผู้ถือหุ้นรายย่อย'],format:'number'},
@@ -746,6 +756,7 @@ const FolioEngine = (() => {
       if(result.count===1){html=result.html;if(result.oldValue!==result.newValue)report.changes.push({item:id,oldValue:result.oldValue,newValue:result.newValue,source:fact.source});}
       else addHtmlIssue(result.count?`พบ label “${labels[0]}” หลายจุด จึงไม่แทนที่`:`พบ ${id} ใน workbook แต่ไม่พบ label/value ของภาษาที่เลือกใน HTML`,labels[0]);
     }
+    const htmlLabels=normalize(plainText(originalHtml));for(const [id,rule] of Object.entries(factRules)){if(summary.shareholderFacts?.[id])continue;const labels=rule.labels.filter(label=>targetLanguage==='th'?hasThaiText(label):!hasThaiText(label)),label=labels.find(candidate=>htmlLabels.includes(normalize(candidate)));if(label)addHtmlIssue(`ไม่พบค่า ${id} ใน workbook · ค่าเดิมคงไว้`,label);}
     const names=new Map(),ambiguousNames=new Set();for(const row of rows)for(const alias of row.aliases?.length?row.aliases:[row.name]){const key=normalize(alias);if(!key)continue;const previous=names.get(key);if(previous&&(previous.shares!==row.shares||previous.percent!==row.percent))ambiguousNames.add(key);else if(!previous)names.set(key,row);}for(const key of ambiguousNames){names.delete(key);report.unmatched.push(`ชื่อผู้ถือหุ้น “${key}” ซ้ำใน workbook แต่ตัวเลขไม่ตรงกัน · ไม่เลือกค่าแทน`);}const safeRows=rows.filter(row=>!(row.aliases?.length?row.aliases:[row.name]).some(alias=>ambiguousNames.has(normalize(alias))));let found=0,matchedCount=0,shareholderTableFound=false;
     html=html.replace(/<table\b[\s\S]*?<\/table>/gi,(table,tableStart)=>{
       const trs=scanRows(table);if(!trs.length)return table;const header=trs.find(r=>/shareholder|ผู้ถือหุ้น/i.test(r.cells.map(c=>c.text).join(' ')));if(!header)return table;
