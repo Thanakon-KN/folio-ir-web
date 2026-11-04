@@ -74,7 +74,7 @@
     renderCodeIssues(result.codeIssues||[]);
     const lines=[...result.changes.map(c=>`เปลี่ยน: ${c.item} · ${c.oldValue} → ${c.newValue} · ที่มา ${c.source}`),...result.unmatched.map(x=>'จับคู่ไม่ได้: '+x)];
     $('#report-result').value=lines.length?lines.join('\n'):'ไม่มีการเปลี่ยนแปลงที่จับคู่ได้';$('#notes-result').value=(result.notes||[]).join('\n')||'ไม่มีหมายเหตุเพิ่มเติม';
-    const issueCount=(result.unmatched||[]).length;$('#result-badge').textContent=issueCount?`ตรวจสอบ ${issueCount} จุด${result.changes.length?` · อัปเดตแล้ว ${result.changes.length} รายการ`:''}`:result.changes.length?'สร้างผลลัพธ์แล้ว · '+result.changes.length+' รายการ':'ไม่มีจุดที่จับคู่ได้';$('#result-badge').dataset.state=issueCount||!result.changes.length?'warning':'success';$('#result-badge').disabled=!issueCount;$('#result-badge').setAttribute('aria-label',issueCount?`ไปยังรายการตรวจสอบ ${issueCount} จุด`:'');$('.result-card').dataset.state=issueCount||!result.changes.length?'incomplete':'complete';
+    const issueCount=(result.unmatched||[]).length,changeCount=result.changes.length,badge=$('#result-badge');badge.textContent=issueCount?(changeCount?`อัปเดตแล้ว · ${changeCount} รายการ · พบปัญหา ${issueCount} จุด`:`พบปัญหา ${issueCount} จุด`):changeCount?`อัปเดตแล้ว · ${changeCount} รายการ · ไม่มีปัญหา`:'ไม่มีรายการที่อัปเดต';badge.dataset.state=issueCount?'warning':changeCount?'success':'empty';badge.dataset.issueCount=String(issueCount);badge.disabled=!issueCount&&!changeCount;badge.setAttribute('aria-label',issueCount?`ไปยัง error ${issueCount} จุด`:`ดูรายงานการอัปเดต ${changeCount} รายการ`);$('.result-card').dataset.state=issueCount||!changeCount?'incomplete':'complete';
     $$('button.copy-result,button.download-result').forEach(b=>b.disabled=!$('#'+b.dataset.target).value.trim());ui.result=true;
     if(typeof queueHtmlPreview==='function')queueHtmlPreview(true);if(typeof queueJsDataPreview==='function')queueJsDataPreview();msg(result.changes.length?'ฟังก์ชันสร้างผลลัพธ์แล้ว กรุณาตรวจรายงานก่อนนำไปใช้':'ยังไม่มีข้อมูลที่จับคู่ได้ชัดเจน · ดูหมายเหตุและตรวจรูปแบบโค้ด','success');renderGuide();$('#result-title').scrollIntoView({behavior:'smooth',block:'center'});
   }
@@ -106,8 +106,8 @@
   function jumpToReportedIssues(){
     if($('#result-badge').disabled)return;
     const reportCard=$('.report-collapsible');if(reportCard)reportCard.open=true;
-    const target=$('#code-issue-panel').hidden?$('#report-result'):$('#code-issue-panel');
-    requestAnimationFrame(()=>{target.scrollIntoView({behavior:'smooth',block:'center'});const firstIssue=$('#code-issue-list .code-issue-item');if(firstIssue)firstIssue.focus({preventScroll:true});else $('#report-result').focus({preventScroll:true});});
+    const hasIssues=Number($('#result-badge').dataset.issueCount)>0,target=hasIssues&&!$('#code-issue-panel').hidden?$('#code-issue-panel'):$('#report-result');
+    requestAnimationFrame(()=>{target.scrollIntoView({behavior:'smooth',block:'center'});const firstIssue=hasIssues?$('#code-issue-list .code-issue-item'):null;if(firstIssue)firstIssue.focus({preventScroll:true});else $('#report-result').focus({preventScroll:true});});
   }
   function run(){if(!readyToUpdate())return;ui.busy=true;updateButtons();try{const payload={html:$('#html-code').value,javascript:$('#javascript-code').value};const result=isShareholder()?FolioEngine.updateShareholders(payload,ui.inspection):FolioEngine.updateFinancial(payload,ui.inspection,selected(),mode(),targetLanguage());renderResult(result);}catch(error){msg(error.message||'สร้างผลลัพธ์ไม่สำเร็จ','error');}finally{ui.busy=false;updateButtons();}}
   function saveDraft(){try{localStorage.setItem(key(),JSON.stringify({html:$('#html-code').value,javascript:$('#javascript-code').value,request:$('#request').value}));}catch{}}
