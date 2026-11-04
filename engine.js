@@ -53,8 +53,9 @@ const FolioEngine = (() => {
   const decimalPlaces = value => { const match=String(value??'').replace(/,/g,'').match(/\.(\d+)/); return match?match[1].length:0; };
   const formatSourceNumber=(oldValue,value,source={})=>{
     if(source.formula){const sign=value<0?'-':'',fixed=Math.abs(value).toFixed(1),[whole,fraction]=fixed.split('.');return sign+whole.padStart(4,'0')+'.'+fraction+(/%/.test(String(oldValue||''))?'%':'');}
-    if(typeof source.raw==='string'&&numberFrom(source.raw)!==null){const formatted=Math.abs(value).toLocaleString('en-US',{useGrouping:true,maximumFractionDigits:0});return (value<0?'-':'')+formatted+(/%/.test(String(oldValue||''))?'%':'');}
-    return formatLike(oldValue,value);
+    const old=String(oldValue??''),decimals=decimalPlaces(old),formatted=Math.abs(value).toLocaleString('en-US',{useGrouping:true,minimumFractionDigits:decimals,maximumFractionDigits:decimals});
+    if(value<0&&/\(.*\)/.test(old))return '('+formatted+')';
+    return (value<0?'-':'')+formatted+(/%/.test(old)?'%':'');
   };
   const parseSourceDate=(value,format='',raw=value)=>{
     const text=String(value??'').trim();if(!text)return null;
