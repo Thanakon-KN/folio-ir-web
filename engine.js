@@ -78,6 +78,7 @@ const FolioEngine = (() => {
     if(/^[A-Za-z]+\s+\d{1,2},?\s+\d{4}$/.test(value))return `${englishMonths[date.month-1]} ${date.day}, ${date.year}`;
     return `${date.day} ${englishMonths[date.month-1]} ${date.year}`;
   };
+  const dateFragment=value=>String(value??'').match(/\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}|\d{1,2}\s+[A-Za-z]+,?\s+\d{4}|[A-Za-z]+\s+\d{1,2},?\s+\d{4}|\d{1,2}\s*[ก-๙]+\s*\d{4}/)?.[0]||'';
   const parseWorkbook = async files => {
     if (!window.XLSX) throw new Error('โหลดตัวอ่าน Excel ไม่สำเร็จ');
     if (!files.length) throw new Error('เลือกไฟล์ข้อมูลต้นทางก่อน');
@@ -225,25 +226,38 @@ const FolioEngine = (() => {
   };
   function extractShareholderFacts(workbook){
     const rules=[
-      ['rightsType',/^(rightstype|typeofrights|typeofshare|ประเภทสิทธิ|สิทธิประโยชน์)$/i,'overview'],
+      ['rightsType',/^(rightstype|typeofrights|typeofshare|ประเภทสิทธิ|ประเภท|สิทธิประโยชน์)$/i,'overview'],
       ['overviewDate',/^(overviewdate|asofdate|asof|asat|asatdate|dateasof|shareholdersasof|shareholdersasofdate|dateofshareholders|dateofshareholderinformation|วันที่ข้อมูล|ข้อมูลณวันที่|ณวันที่|วันที่ปิดสมุดทะเบียน)$/i,'overview'],
       ['totalShareholders',/^(totalshareholders|totalnumberofshareholders|numberofshareholders|numberoftotalshareholders|ผู้ถือหุ้นทั้งหมด|จำนวนผู้ถือหุ้น|จำนวนผู้ถือหุ้นทั้งหมด)$/i,'overview'],
-      ['scripless',/^(scripless|scriplessholding|scriplessshares|ระบบไร้ใบหุ้น|ถือครองผ่านระบบไร้ใบหุ้น)$/i,'overview'],
+      ['scripless',/^(scripless|scriplessholding|scriplessshares|sharesscriplessholding|ระบบไร้ใบหุ้น|ถือครองผ่านระบบไร้ใบหุ้น|การถือหุ้นแบบไร้ใบหุ้น)$/i,'overview'],
       ['freeFloatDate',/^(freefloatdate|freefloatasof|minoritydate|minorityasof|dateoffreefloat|dateoffreefloatinformation|วันที่ผู้ถือหุ้นรายย่อย|วันที่ข้อมูลfreefloat|วันที่ข้อมูลผู้ถือหุ้นรายย่อย)$/i,'free-float'],
       ['minorShareholders',/^(minorshareholders|numberofminorshareholders|numberofminorityshareholders|ผู้ถือหุ้นรายย่อย|จำนวนผู้ถือหุ้นรายย่อย)$/i,'free-float'],
-      ['freeFloatPercent',/^(freefloat|freefloatpercent|freefloatpercentage|freefloatpercentofshares|freefloatpercentageofshares|สัดส่วนผู้ถือหุ้นรายย่อย|ร้อยละผู้ถือหุ้นรายย่อย)$/i,'free-float']
+      ['freeFloatPercent',/^(freefloat|freefloatpercent|freefloatpercentage|freefloatpercentofshares|freefloatpercentageofshares|sharessinminorshareholdersfreefloat|สัดส่วนผู้ถือหุ้นรายย่อย|ร้อยละผู้ถือหุ้นรายย่อย|การถือหุ้นของผู้ถือหุ้นรายย่อยfreefloat)$/i,'free-float']
     ];
     const facts={},ruleFor=value=>rules.find(([,re])=>re.test(normalize(value))),numericIds=new Set(['totalShareholders','scripless','minorShareholders','freeFloatPercent']),dateIds=new Set(['overviewDate','freeFloatDate']);
+    const classify=cell=>{
+      const text=String(cell?.text??'').trim(),exact=ruleFor(text);if(exact)return {id:exact[0],section:exact[2],inline:''};
+      const date=dateFragment(text),key=normalize(text);
+      if(date&&(/overview|shareholdersasof|ข้อมูลผู้ถือหุ้น|ภาพรวม/.test(key)||(/asof/.test(key)&&!/freefloat|minor/.test(key))))return {id:'overviewDate',section:'overview',inline:date};
+      if(date&&(/freefloat|minor|ผู้ถือหุ้นรายย่อย/.test(key)))return {id:'freeFloatDate',section:'free-float',inline:date};
+      const colon=text.match(/^\s*([^:：]+)\s*[:：]\s*(.*?)\s*$/);if(colon){const label=ruleFor(colon[1]);if(label&&colon[2])return {id:label[0],section:label[2],inline:colon[2]};}
+      return null;
+    };
+    const equivalent=(left,right,id)=>{
+      if(dateIds.has(id)){const a=parseSourceDate(left.value,left.format,left.raw),b=parseSourceDate(right.value,right.format,right.raw);return Boolean(a&&b&&a.day===b.day&&a.month===b.month&&a.year===b.year);}
+      if(numericIds.has(id)){const a=numberFrom(left.value),b=numberFrom(right.value);return a!==null&&b!==null&&a===b;}
+      return normalize(left.value)===normalize(right.value);
+    };
     for(const book of workbook.books)for(const sheet of book.sheets)for(const row of sheet.rows)for(const cell of row.cells){
-      const matched=ruleFor(cell.text);if(!matched)continue;const [id,,section]=matched,numericFact=numericIds.has(id),dateFact=dateIds.has(id);
-      const isValue=c=>{if(!c?.text||ruleFor(c.text))return false;if(numericFact)return numberFrom(c.raw)!==null||numberFrom(c.text)!==null||/^[-–—]$/.test(c.text);if(dateFact)return parseSourceDate(c.text,c.format,c.raw)!==null;return true;};
-      const sameRow=row.cells.filter(c=>c.col>cell.col&&c.text).sort((a,b)=>a.col-b.col);let value=null,labelEnd=cell.col;
-      for(const candidate of sameRow){const nextLabel=ruleFor(candidate.text);if(nextLabel){if(nextLabel[0]===id){labelEnd=candidate.col;continue;}break;}if(candidate.col<=labelEnd)continue;if(isValue(candidate))value=candidate;break;}
-      if(!value){const nextRow=sheet.rows.find(r=>r.row===row.row+1);const labelCols=[cell.col,...sameRow.filter(c=>ruleFor(c.text)?.[0]===id).map(c=>c.col)];for(const col of labelCols){const below=nextRow?.cells.find(c=>c.col===col&&c.text);if(isValue(below)){value=below;break;}}}
+      const matched=classify(cell);if(!matched)continue;const {id,section,inline}=matched,numericFact=numericIds.has(id),dateFact=dateIds.has(id);
+      const isValue=c=>{if(!c?.text||classify(c))return false;if(numericFact)return numberFrom(c.raw)!==null||numberFrom(c.text)!==null||/^[-–—]$/.test(c.text);if(dateFact)return parseSourceDate(c.text,c.format,c.raw)!==null;return true;};
+      const sameRow=row.cells.filter(c=>c.col>cell.col&&c.text).sort((a,b)=>a.col-b.col);let value=inline?{...cell,text:inline,raw:inline,format:'',formula:''}:null,labelEnd=cell.col;
+      if(!value)for(const candidate of sameRow){const nextLabel=classify(candidate);if(nextLabel){if(nextLabel.id===id){labelEnd=candidate.col;continue;}break;}if(candidate.col<=labelEnd)continue;if(isValue(candidate))value=candidate;break;}
+      if(!value){const nextRow=sheet.rows.find(r=>r.row===row.row+1);const labelCols=[cell.col,...sameRow.filter(c=>classify(c)?.id===id).map(c=>c.col)];for(const col of labelCols){const below=nextRow?.cells.find(c=>c.col===col&&c.text);if(isValue(below)){value=below;break;}}}
       if(!value)continue;
-      const candidate={value:value.text,raw:value.raw,formula:value.formula||'',format:value.format||'',source:`${book.name} / ${sheet.name} / ${cell.address}:${value.address}`,sheet:sheet.name,section,preferred:section==='free-float'?/free\s*float|minor|รายย่อย/i.test(sheet.name):/overview|ภาพรวม/i.test(sheet.name)};
+      const candidate={value:value.text,raw:value.raw,formula:value.formula||'',format:value.format||'',source:`${book.name} / ${sheet.name} / ${cell.address}:${value.address||cell.address}`,sheet:sheet.name,section,preferred:section==='free-float'?/free\s*float|minor|รายย่อย/i.test(sheet.name):/overview|ภาพรวม/i.test(sheet.name)};
       if(!facts[id]||(!facts[id].preferred&&candidate.preferred))facts[id]=candidate;
-      else if(facts[id].preferred===candidate.preferred&&normalize(facts[id].value)!==normalize(candidate.value)){facts[id].ambiguous=true;facts[id].alternatives||=[facts[id].source];facts[id].alternatives.push(candidate.source);}
+      else if(facts[id].preferred===candidate.preferred&&!equivalent(facts[id],candidate,id)){facts[id].ambiguous=true;facts[id].alternatives||=[facts[id].source];facts[id].alternatives.push(candidate.source);}
     }
     return facts;
   }
@@ -329,6 +343,7 @@ const FolioEngine = (() => {
     return out;
   }
   const cellAtColumn=(row,column)=>row.cells.find(cell=>column>=cell.column&&column<cell.endColumn)||null;
+  const unmergeCell=(raw)=>raw.replace(/\s+colspan\s*=\s*(["'])\d+\1/i,'').replace(/\s+colspan\s*=\s*\d+/i,'');
   const replaceCellText=(raw,oldText,newText)=>{
     let next=raw;
     // Vue numeric components commonly store a value in :number or number attributes.
@@ -396,9 +411,8 @@ const FolioEngine = (() => {
     const tables=[...html.matchAll(/<table\b[\s\S]*?<\/table>/gi)];let changed=false,matched=false;
     let updated=html.replace(/<table\b[\s\S]*?<\/table>/gi,(table,tableStart)=>{
       const rows=scanRows(table);let headIndex=-1,periodCols=[];
-      rows.forEach((row,index)=>{const ps=row.cells.map(c=>({period:periodFrom(c.text),column:c.column,span:c.span})).filter(x=>x.period);if(ps.length>periodCols.length&&ps.length>=1){periodCols=ps;headIndex=index;}});
+      let bestHeaderScore=-1;rows.forEach((row,index)=>{const ps=row.cells.map(c=>({period:periodFrom(c.text),column:c.column,span:c.span})).filter(x=>x.period);if(!ps.length)return;const score=ps.length*100-ps.reduce((sum,item)=>sum+item.span-1,0);if(score>bestHeaderScore){bestHeaderScore=score;periodCols=ps;headIndex=index;}});
       if(headIndex<0||!periodCols.length)return table;
-      if(periodCols.some(period=>period.span!==1)){const message='พบหัวงวดที่ใช้ colspan · คงตารางเดิมไว้เพื่อไม่ให้คอลัมน์เลื่อน';report.unmatched.push(message);addCodeIssue(report,'html',html,tableStart,tableStart+table.length,message);return table;}
       const comparisonCols=rows[headIndex].cells.map(cell=>({cell,type:comparisonType(cell.text)})).filter(item=>item.type&&!periodFrom(item.cell.text)).map(item=>{const owner=periodCols.filter(period=>period.column<=item.cell.column).sort((a,b)=>b.column-a.column)[0]||[...periodCols].sort((a,b)=>Math.abs(a.column-item.cell.column)-Math.abs(b.column-item.cell.column))[0];return owner?{type:item.type,column:item.cell.column,period:owner.period}:null;}).filter(Boolean);
       // Keep every comparison column found in the original table. If its original
       // period is not selected, attach it to the latest selected period of the
@@ -408,8 +422,6 @@ const FolioEngine = (() => {
       for(const item of comparisonPlans){if(!comparisonTypesByPeriod.has(item.targetId))comparisonTypesByPeriod.set(item.targetId,[]);comparisonTypesByPeriod.get(item.targetId).push(item);}
       const dataColumns=[...periodCols.map(item=>({column:item.column,span:item.span})),...comparisonCols.map(item=>({column:item.column,span:1}))];
       const tablePeriodStart=Math.min(...dataColumns.map(p=>p.column)),tablePeriodEnd=Math.max(...dataColumns.map(p=>p.column+p.span));
-      const unsafeRow=rows.find((row,index)=>index!==headIndex&&row.cells.some(cell=>cell.span>1&&cell.column<tablePeriodEnd&&cell.endColumn>tablePeriodStart)&&targetLabelCells(row,periodCols,language).some(cell=>findMetric(summary.metrics,cell.text,'detail',selected)));
-      if(unsafeRow){const message=`ตารางมี colspan ในแถว “${metricLabelCell(unsafeRow,periodCols)?.text||'ไม่ทราบชื่อ'}” · คงตารางเดิมไว้เพื่อไม่ให้ข้อมูลเหลื่อม`;report.unmatched.push(message);addCodeIssue(report,'html',html,tableStart,tableStart+table.length,message);return table;}
       const known=new Map(periodCols.map(x=>[x.period.id,x.column]));const wanted=selected.map(p=>p.id);const sourcePeriod=new Map(summary.displayPeriods.map(p=>[p.id,p]));
       let tableRows=rows.slice();
       for(let ri=0;ri<tableRows.length;ri++){
@@ -420,16 +432,16 @@ const FolioEngine = (() => {
         matched=true;
         const startCol=tablePeriodStart,endCol=tablePeriodEnd;
         const baseCells=row.cells.filter(c=>c.endColumn<=startCol).map(c=>c.raw),trailingCells=row.cells.filter(c=>c.column>=endCol).map(c=>c.raw),valueCells=[],periodTemplate=cellAtColumn(row,periodCols[0].column),comparisonTemplate=comparisonCols.length?cellAtColumn(row,comparisonCols[0].column):null;
-        for(const id of wanted){const oldIndex=known.get(id),old=oldIndex===undefined?null:cellAtColumn(row,oldIndex),source=metric.values[id];valueCells.push(financialValueCell(old,periodTemplate,source,metric.label));
+        for(const id of wanted){const oldIndex=known.get(id),foundOld=oldIndex===undefined?null:cellAtColumn(row,oldIndex),old=foundOld?.span>1?{...foundOld,raw:unmergeCell(foundOld.raw),span:1,endColumn:foundOld.column+1}:foundOld,source=metric.values[id],template=periodTemplate&&periodTemplate.span>1?{...periodTemplate,raw:unmergeCell(periodTemplate.raw),span:1,endColumn:periodTemplate.column+1}:periodTemplate;valueCells.push(financialValueCell(old,template,source,metric.label));
           if(!source&&oldIndex===undefined){const message=`HTML “${labelCell.text}” ไม่มีค่า ${formatPeriodLabel(sourcePeriod.get(id)||{year:Number(id.slice(0,4)),quarter:Number(id.match(/-Q([1-4])/)?.[1]||0)},language)} จาก workbook`;report.unmatched.push(message);addCodeIssue(report,'html',html,tableStart,tableStart+table.length,message);}
-          for(const comparison of comparisonTypesByPeriod.get(id)||[]){const type=comparison.type,compareColumn=comparison.column,oldCompare=cellAtColumn(row,compareColumn),comparisonMetric=findComparisonMetric(summary.metrics,metric.label,type,'detail',selected),sourceCompare=metric.comparisons?.[id+':'+type]||comparisonMetric?.values[id]||null;valueCells.push(financialValueCell(oldCompare,oldCompare||comparisonTemplate||periodTemplate,sourceCompare,metric.label+' '+type));if(sourceCompare&&sourceCompare.value!==null)matched=true;}
+          for(const comparison of comparisonTypesByPeriod.get(id)||[]){const type=comparison.type,compareColumn=comparison.column,foundCompare=cellAtColumn(row,compareColumn),oldCompare=foundCompare?.span>1?{...foundCompare,raw:unmergeCell(foundCompare.raw),span:1,endColumn:foundCompare.column+1}:foundCompare,comparisonMetric=findComparisonMetric(summary.metrics,metric.label,type,'detail',selected),sourceCompare=metric.comparisons?.[id+':'+type]||comparisonMetric?.values[id]||null,valueTemplate=(oldCompare||comparisonTemplate||periodTemplate)?.span>1?{...(oldCompare||comparisonTemplate||periodTemplate),raw:unmergeCell((oldCompare||comparisonTemplate||periodTemplate).raw),span:1,endColumn:(oldCompare||comparisonTemplate||periodTemplate).column+1}:(oldCompare||comparisonTemplate||periodTemplate);valueCells.push(financialValueCell(oldCompare,valueTemplate,sourceCompare,metric.label+' '+type));if(sourceCompare&&sourceCompare.value!==null)matched=true;}
         }
         const newRaw=replaceRowCells(row,[...baseCells,...valueCells,...trailingCells]);
         if(newRaw!==row.raw){changed=true;tableRows[ri]={...row,raw:newRaw};report.changes.push({item:labelCell.text,oldValue:'ตารางเดิม',newValue:wanted.map(id=>formatPeriodLabel(sourcePeriod.get(id)||{year:Number(id.slice(0,4)),quarter:Number(id.match(/-Q([1-4])/)?.[1]||0)},language)).join(', '),source:metric.sheet+' row '+metric.row});}
       }
       // Restrict rewriting to tables containing recognizable financial metric rows.
       if(!tableRows.some((row,i)=>i!==headIndex&&targetLabelCells(row,periodCols,language).some(cell=>findMetric(summary.metrics,cell.text,'detail',selected))))return table;
-      const header=tableRows[headIndex],firstPeriod=tablePeriodStart,lastPeriod=tablePeriodEnd;const base=header.cells.filter(c=>c.endColumn<=firstPeriod).map(c=>c.raw),trailing=header.cells.filter(c=>c.column>=lastPeriod).map(c=>c.raw);const template=cellAtColumn(header,periodCols[0].column),headCells=[];for(const id of wanted){const found=known.get(id),cell=found===undefined?template:cellAtColumn(header,found),period=sourcePeriod.get(id)||{year:Number(id.slice(0,4)),quarter:Number(id.match(/-Q([1-4])/)?.[1]||0)},label=formatPeriodLabel(period,language);headCells.push(cell?replaceCellText(cell.raw,cell.text,label):`<th>${label}</th>`);for(const comparison of comparisonTypesByPeriod.get(id)||[]){const compareCell=cellAtColumn(header,comparison.column);if(compareCell)headCells.push(compareCell.raw);}}
+      const header=tableRows[headIndex],firstPeriod=tablePeriodStart,lastPeriod=tablePeriodEnd;const base=header.cells.filter(c=>c.endColumn<=firstPeriod).map(c=>c.raw),trailing=header.cells.filter(c=>c.column>=lastPeriod).map(c=>c.raw);const template=cellAtColumn(header,periodCols[0].column),headCells=[];for(const id of wanted){const found=known.get(id),cell=found===undefined?template:cellAtColumn(header,found),period=sourcePeriod.get(id)||{year:Number(id.slice(0,4)),quarter:Number(id.match(/-Q([1-4])/)?.[1]||0)},label=formatPeriodLabel(period,language);headCells.push(cell?replaceCellText(unmergeCell(cell.raw),cell.text,label):`<th>${label}</th>`);for(const comparison of comparisonTypesByPeriod.get(id)||[]){const compareCell=cellAtColumn(header,comparison.column);if(compareCell)headCells.push(compareCell.raw);}}
       tableRows[headIndex]={...header,raw:replaceRowCells(header,[...base,...headCells,...trailing])};
       // Apply row-level column filtering/insertion only if the table header exposes period columns.
       return tableRows.map((row,i)=>({row,i})).sort((a,b)=>b.row.start-a.row.start).reduce((result,item)=>result.slice(0,item.row.start)+item.row.raw+result.slice(item.row.end),table);

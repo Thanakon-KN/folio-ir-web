@@ -56,8 +56,15 @@
     if(summary.blocks){for(const block of summary.blocks){const p=document.createElement('p');p.textContent=`${block.label}: ${block.references.length?block.references.join(' · '):'ไม่พบ'}`;container.append(p);}}
     if(summary.shareholderFacts&&Object.keys(summary.shareholderFacts).length){const facts=document.createElement('ul');for(const [key,item] of Object.entries(summary.shareholderFacts)){const li=document.createElement('li');li.textContent=`${key}: ${item.value} · ${item.source}`;facts.append(li);}container.append(facts);}
     for(const warning of summary.warnings||[]){const p=document.createElement('p');p.className='inspection-warning';p.textContent=warning;container.append(p);}
-    if(!isShareholder())renderPeriods(summary.displayPeriods||[]);
-    $('#result-badge').textContent='ตรวจไฟล์แล้ว';$('#result-badge').dataset.state='ready';
+    if(!isShareholder()){
+      const cumulativePeriods=(summary.sourcePeriods||[]).filter(period=>[3,6,9].includes(period.months)||period.halfYear);
+      const selected=new Set(ui.selectedPeriods);
+      for(const period of cumulativePeriods)selected.add(period.id);
+      ui.selectedPeriods=[...selected];
+      renderPeriods(summary.displayPeriods||[]);
+      if(cumulativePeriods.length){const note=document.createElement('p');note.className='inspection-note';note.textContent='เลือกงวดสะสมจากไฟล์ให้อัตโนมัติ: '+periodsByUiOrder(cumulativePeriods).map(period=>period.label).join(', ');container.append(note);}
+    }
+    $('#result-badge').textContent='ตรวจไฟล์แล้ว';$('#result-badge').dataset.state='empty';$('#result-badge').disabled=true;$('#result-error-badge').hidden=true;$('#result-error-badge').disabled=true;
   }
   function periodsByUiOrder(periods=[]){const annual=period=>!period.quarter&&!period.months&&!period.halfYear;const rank=period=>period.quarter?period.quarter*3:period.months||(period.halfYear?6:13);return [...periods].sort((a,b)=>Number(!annual(a))-Number(!annual(b))||a.year-b.year||rank(a)-rank(b)||String(a.id).localeCompare(String(b.id)));}
   function renderPeriods(periods){const available=$('#period-options'),chosen=$('#period-selected'),selectedIds=new Set(ui.selectedPeriods);available.replaceChildren();chosen.replaceChildren();for(const period of periodsByUiOrder(periods)){if(selectedIds.has(period.id))continue;const button=document.createElement('button');button.type='button';button.className='period-choice';button.title='เพิ่ม '+period.label+' ลงในลำดับผลลัพธ์';const strong=document.createElement('strong');strong.textContent=period.label;const badges=[];if(period.inSource)badges.push('ไฟล์');if(period.inExisting)badges.push('โค้ดเดิม');const small=document.createElement('small');small.textContent=badges.join(' · ');button.append(strong,small);button.addEventListener('click',()=>addSelectedPeriods([period.id]));available.append(button);}
