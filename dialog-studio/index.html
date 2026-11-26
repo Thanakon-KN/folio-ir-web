@@ -166,6 +166,15 @@ canvas { display: block; }
   color: var(--ink); background: var(--surface); box-shadow: 0 22px 75px #201b464d;
 }
 .export::backdrop { background: #1f1c3a80; }
+.builder-dialog { width: min(640px, calc(100% - 24px)); }
+.builder-dialog form.builder-form { margin-top: 14px; }
+.builder-dialog summary { margin-top: 12px; cursor: pointer; font-weight: 600; }
+.builder-dialog .builder-check { display: flex; gap: 8px; align-items: center; }
+.builder-check input { width: auto; margin: 0; }
+.builder-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; margin-top: 16px; gap: 8px; }
+.builder-dialog #popupBrief { min-height: 94px; }
+.stage-note #popupAiStatus { color: #4a399c; }
+#cancelPopupAi { padding: 3px 8px; font-size: 11px; }
 .export-heading { display: flex; justify-content: space-between; gap: 12px; }
 .export-heading h2 { font-size: 18px; margin-bottom: 4px; }
 .export-heading button { font-size: 20px; line-height: 1; }
@@ -195,6 +204,7 @@ canvas { display: block; }
 <header class="appbar">
   <div class="brand"><span class="logo" aria-hidden="true"></span><strong>Dialog Studio</strong></div>
   <div class="app-actions">
+    <button id="openPopupBuilder" class="header-action" type="button">สร้าง Popup</button>
     <button id="loadProject" class="header-action" type="button">เปิดงาน</button>
     <button id="saveProject" class="header-action" type="button">บันทึกงาน</button>
     <button id="openExport" class="primary" type="button">ส่งออก <span aria-hidden="true">↗</span></button>
@@ -277,10 +287,47 @@ canvas { display: block; }
       </div>
     </div>
     <div class="workspace"><canvas id="art" width="1200" height="800" tabindex="0" aria-label="พื้นที่ออกแบบ คลิกเลือกและลากย้ายองค์ประกอบ ใช้ปุ่มลูกศรเพื่อขยับ"></canvas></div>
-    <div class="stage-note"><span>คลิกเลือก · ลากเพื่อย้าย</span><span id="status" role="status" aria-live="polite"></span></div>
+    <div class="stage-note"><span>คลิกเลือก · ลากเพื่อย้าย</span><span id="status" role="status" aria-live="polite"></span><span id="popupAiStatus" role="status" aria-live="polite"></span><button id="cancelPopupAi" type="button" hidden>หยุดสร้างภาพ AI</button></div>
   </main>
   <aside class="right"><div class="inspector-heading"><h2>ปรับแต่ง</h2><span id="selectionKind"></span></div><div id="empty" class="empty">เลือกข้อความ รูปภาพ หรือปุ่มบนชิ้นงาน เพื่อปรับแต่งที่นี่</div><div id="properties" class="hidden"><div><label for="content">ข้อความ</label><textarea id="content"></textarea></div><div id="urlWrap"><label for="url">ลิงก์ปลายทางปุ่ม</label><input id="url" placeholder="https://example.com"></div><div><label>ตำแหน่ง · px</label><div class="grid"><input id="x" type="number" aria-label="ตำแหน่ง X"><input id="y" type="number" aria-label="ตำแหน่ง Y"></div></div><div><label>ขนาดกล่อง · px</label><div class="grid"><input id="ew" type="number" min="20" aria-label="ความกว้างองค์ประกอบ"><input id="eh" type="number" min="20" aria-label="ความสูงองค์ประกอบ"></div></div><div id="fontWrap"><label for="fontSize">ขนาดตัวอักษร · px</label><input id="fontSize" type="number" min="8" max="400"></div><div><label for="color">สีตัวอักษร</label><input id="color" type="color"></div><div id="fillWrap"><label for="fill">สีปุ่ม</label><input id="fill" type="color"></div><div><label for="align">จัดแนวข้อความ</label><select id="align"><option value="left">ชิดซ้าย</option><option value="center">กึ่งกลาง</option><option value="right">ชิดขวา</option></select></div><div><label for="weight">น้ำหนักตัวอักษร</label><select id="weight"><option value="400">ปกติ</option><option value="700">หนา</option></select></div><div><label>จัดวางและลำดับ</label><div class="group"><button id="center">จัดกลาง</button><button id="forward">ขึ้นหน้า</button><button id="backward">ลงหลัง</button></div></div><div><div class="divider"></div><div class="group"><button id="duplicate">ทำสำเนา</button><button id="delete">ลบ</button></div></div></div></aside>
 </div>
+<dialog id="popupBuilder" class="export builder-dialog" aria-labelledby="popupBuilderTitle">
+  <div class="export-heading">
+    <div><h2 id="popupBuilderTitle">สร้าง Popup จากบรีฟ</h2><p>กำหนดขนาด ใส่บรีฟ แล้วเว็บจะจัดพื้นหลัง ข้อความ และปุ่มให้แก้ต่อได้</p></div>
+    <form method="dialog"><button type="submit" aria-label="ปิดหน้าต่างสร้าง Popup">×</button></form>
+  </div>
+  <form id="popupBuilderForm" class="builder-form">
+    <div class="grid">
+      <div><label for="popupWidth">ความกว้าง (px)</label><input id="popupWidth" type="number" required min="240" max="4000" step="1" placeholder="1200"></div>
+      <div><label for="popupHeight">ความสูง (px)</label><input id="popupHeight" type="number" required min="180" max="4000" step="1" placeholder="800"></div>
+    </div>
+    <label for="popupBrief">บรีฟหรือข้อความที่ต้องการแสดง</label>
+    <textarea id="popupBrief" maxlength="1600" placeholder="เช่น เชิญผู้ถือหุ้นเสนอวาระประชุม AGM&#10;พื้นหลังห้องประชุมโทนแดงเข้ม ดูเป็นทางการ"></textarea>
+    <details>
+      <summary>ข้อความพร้อมใช้และลิงก์ปุ่ม</summary>
+      <label for="popupHeadline">หัวข้อพร้อมใช้</label><input id="popupHeadline" maxlength="220">
+      <label for="popupBody">รายละเอียดพร้อมใช้</label><textarea id="popupBody" maxlength="1000"></textarea>
+      <div class="grid">
+        <div><label for="popupButtonLabel">ข้อความปุ่ม</label><input id="popupButtonLabel" maxlength="80"></div>
+        <div><label for="popupButtonUrl">URL ปลายทาง</label><input id="popupButtonUrl" type="url" placeholder="https://"></div>
+      </div>
+    </details>
+    <details>
+      <summary>รูปอ้างอิงหรือรูปที่จะใช้</summary>
+      <label for="popupReference">ภาพอ้างอิงสำหรับโทนสี</label>
+      <input id="popupReference" type="file" accept="image/png,image/jpeg,image/webp">
+      <label for="popupBackground">รูปที่ใช้เป็นพื้นหลังจริง</label>
+      <input id="popupBackground" type="file" accept="image/png,image/jpeg,image/webp">
+      <label for="popupLogo">โลโก้ที่จะวางบน Popup</label>
+      <input id="popupLogo" type="file" accept="image/png,image/jpeg,image/webp">
+    </details>
+    <label class="builder-check"><input id="popupUseAi" type="checkbox"> สร้างภาพพื้นหลังด้วย AI ในเบราว์เซอร์</label>
+    <div id="popupAiPromptWrap" hidden><label for="popupAiPrompt">คำอธิบายภาพเพิ่มเติม (ถ้ามี)</label><input id="popupAiPrompt" maxlength="360" placeholder="เช่น Dark red boardroom, soft lighting, empty center"></div>
+    <p>ครั้งแรกต้องโหลดโมเดลและใช้เครื่องที่รองรับ WebGPU ถ้ามีรูปพื้นหลังที่อัปโหลด เว็บจะใช้รูปนั้น</p>
+    <div id="popupBuilderError" role="alert"></div>
+    <div class="builder-actions"><button id="createPopup" class="primary" type="submit">สร้าง Popup</button></div>
+  </form>
+</dialog>
 <dialog id="exportDialog" class="export" aria-labelledby="exportTitle">
   <div class="export-heading">
     <div><h2 id="exportTitle">ส่งออกชิ้นงาน</h2><p>ดาวน์โหลดเป็นภาพ หรือเลือก HTML เพื่อให้ปุ่มคลิกได้</p></div>
@@ -1481,5 +1528,304 @@ $('applyAiShape').addEventListener('click', () => {
   $('aiShapeStatus').textContent = 'ใช้กรอบแล้ว แก้รูปทรงต่อได้ในส่วนกำหนดเอง';
 });
 
+function readPopupCopy(brief, headline, detail) {
+  if (headline || detail) return { headline, detail };
+  const [lead = '', ...rest] = brief.split(/\n+/).map(line => line.trim()).filter(Boolean);
+  const visualDirections = /(?:^|\s)(?:พื้นหลัง|โทน(?:สี)?|สไตล์|จัดวาง|background|palette|style|layout)\s*:?\s*/i;
+  const buttonDirections = /(?:^|\s)(?:มีปุ่ม|ใส่ปุ่ม|เพิ่มปุ่ม|with a button)/iu;
+  const contentOnly = line => line.split(visualDirections)[0].split(buttonDirections)[0].trim();
+  return {
+    headline: contentOnly(lead).replace(/^(?:ช่วย)?(?:ทำ|สร้าง|ออกแบบ)\s*(?:popup|ป๊อปอัป|ป๊อปอัพ)\s*(?:สำหรับ|เรื่อง|:)?\s*/i, ''),
+    detail: rest.map(contentOnly).filter(Boolean).join('\n')
+  };
+}
+
+const popupPalettes = [
+  { match: /แดง|red|maroon/i, colors: ['#401326', '#8f273f', '#f4bc8f'], pattern: 'ribbons' },
+  { match: /ทอง|หรู|gold|luxury|premium/i, colors: ['#25201c', '#6f4c2d', '#eed295'], pattern: 'luxury' },
+  { match: /เขียว|ธรรมชาติ|eco|green|nature/i, colors: ['#0c3029', '#2b6950', '#c3e1a5'], pattern: 'contours' },
+  { match: /ฟ้า|น้ำเงิน|เทคโนโลยี|blue|tech/i, colors: ['#102043', '#265989', '#94d6ef'], pattern: 'tech' },
+  { match: /ม่วง|purple|violet/i, colors: ['#281347', '#593b90', '#d8baf4'], pattern: 'arches' },
+  { match: /ชมพู|pink|rose/i, colors: ['#461d3e', '#994664', '#f3b5c8'], pattern: 'waves' }
+];
+
+function samplePopupReference(image) {
+  const sample = document.createElement('canvas');
+  sample.width = 32;
+  sample.height = 24;
+  const context = sample.getContext('2d');
+  context.drawImage(image, 0, 0, sample.width, sample.height);
+  const { data } = context.getImageData(0, 0, sample.width, sample.height);
+  const bins = new Map();
+  const highlights = [0, 0, 0];
+  for (let pixel = 0; pixel < data.length; pixel += 4) {
+    const rgb = [data[pixel], data[pixel + 1], data[pixel + 2]];
+    const value = Math.max(...rgb);
+    const saturation = value - Math.min(...rgb);
+    if (data[pixel + 3] < 128) continue;
+    if (value > 215 && saturation < 28) highlights[Math.floor(((pixel / 4) % sample.width) * 3 / sample.width)]++;
+    if (value < 24 || value > 233 && saturation < 28) continue;
+    const key = rgb.map(value => Math.floor(value / 40)).join(',');
+    const bin = bins.get(key) || { rgb, weight: 0 };
+    bin.weight += 1 + saturation / 60;
+    bins.set(key, bin);
+  }
+  const rgb = [...bins.values()].sort((a, b) => b.weight - a.weight)[0]?.rgb;
+  if (!rgb) return null;
+  const hex = channels => '#' + channels.map(channel => Math.round(channel).toString(16).padStart(2, '0')).join('');
+  const raw = hex(rgb);
+  const leftWeighted = highlights[0] > highlights[1] * 1.65 && highlights[0] > highlights[2] * 1.65;
+  return { colors: [hex(rgb.map(value => value * .30 + 12)), hex(rgb.map(value => value * .62 + 18)), raw],
+    align: leftWeighted ? 'left' : 'center' };
+}
+
+function popupDesignDirection(brief, reference) {
+  const match = popupPalettes.find(preset => preset.match.test(brief));
+  const defaults = [
+    { colors: ['#152339', '#365576', '#b2ddf1'], pattern: 'ribbons' },
+    { colors: ['#2a2342', '#53457a', '#d5c5f7'], pattern: 'contours' },
+    { colors: ['#132d31', '#386566', '#a8e1cc'], pattern: 'diagonal' }
+  ];
+  const fallback = defaults[Math.floor(Math.random() * defaults.length)];
+  const colors = match?.colors || reference?.colors || fallback.colors;
+  const align = /ชิดซ้าย|วางซ้าย|left.align/i.test(brief) ? 'left' :
+    /กึ่งกลาง|ตรงกลาง|center/i.test(brief) ? 'center' : reference?.align || 'center';
+  return { colors, align, pattern: match?.pattern || fallback.pattern };
+}
+
+function composePopup({ width, height, copy, button, background, reference, brief, logo }) {
+  const direction = popupDesignDirection(brief, reference);
+  const [dark, mid, accent] = direction.colors;
+  const design = {
+    w: width, h: height, bgA: dark, bgB: mid, bgAccent: accent,
+    bgPattern: background ? 'plain' : direction.pattern, bgSeed: Math.floor(Math.random() * 1000000),
+    bgIntensity: 21, bgAngle: 122 + Math.round(Math.random() * 22), bgImage: background || '',
+    bgLayer: 'behind', bgShade: background ? 28 : 0, bgColorOpacity: 45, items: []
+  };
+  const typeMeasure = document.createElement('canvas').getContext('2d');
+  const scale = Math.min(width, height * 1.5);
+  const margin = Math.min(width * .12, Math.max(15, width * .085));
+  const textWidth = width - margin * 2;
+  const units = [
+    copy.headline && { type: 'text', text: copy.headline, size: Math.min(140, scale * .066), weight: '700', color: '#ffffff' },
+    copy.detail && { type: 'text', text: copy.detail, size: Math.min(58, scale * .033), weight: '400', color: '#f4f4f7' },
+    button && { type: 'button', ...button, size: Math.min(45, scale * .025), weight: '700', color: '#25233a', fill: '#f7f1e7' }
+  ].filter(Boolean);
+  const maxHeight = height * .84;
+  for (let attempt = 0; attempt < 25; attempt++) {
+    const factor = .95 ** attempt;
+    const gap = Math.max(6, scale * .023 * factor);
+    const metrics = units.map(unit => {
+      const size = Math.max(11, Math.round(unit.size * factor));
+      typeMeasure.font = unit.weight + ' ' + size + 'px Arial,"Segoe UI",sans-serif';
+      const isButton = unit.type === 'button';
+      const lineWidth = isButton ? textWidth - 24 : textWidth;
+      const lines = linesFor(typeMeasure, unit.text, lineWidth);
+      const buttonWidth = Math.min(textWidth, Math.max(Math.min(130, textWidth), typeMeasure.measureText(unit.text).width + 34));
+      return { ...unit, size, w: isButton ? buttonWidth : textWidth,
+        h: Math.ceil(lines.length * size * 1.35 + (isButton ? Math.max(12, size * .8) : 3)) };
+    });
+    if (logo) {
+      const ratio = Math.min(width * .24 / logo.image.width, height * .115 / logo.image.height) * factor;
+      metrics.unshift({ type: 'image', src: logo.src, w: logo.image.width * ratio, h: logo.image.height * ratio });
+    }
+    const stackHeight = metrics.reduce((sum, unit) => sum + unit.h, 0) + (metrics.length - 1) * gap;
+    if (stackHeight > maxHeight) continue;
+    let y = Math.round((height - stackHeight) / 2);
+    for (const unit of metrics) {
+      const isButton = unit.type === 'button';
+      design.items.push({
+        ...unit, id: uid(), x: direction.align === 'left' ? margin : (width - unit.w) / 2, y,
+        align: isButton ? 'center' : direction.align,
+        ...(isButton ? { radius: Math.round(unit.h * .22) } : {})
+      });
+      y += unit.h + gap;
+    }
+    return design;
+  }
+  throw new Error('ข้อความยาวเกินขนาดนี้ กรุณาเพิ่มขนาดชิ้นงานหรือลดข้อความ');
+}
+
+function openPopupBuilder() {
+  $('popupBuilderError').textContent = '';
+  $('popupBuilder').showModal();
+  $('popupWidth').focus();
+}
+
+$('openPopupBuilder').addEventListener('click', openPopupBuilder);
+$('popupBuilderForm').addEventListener('submit', async event => {
+  event.preventDefault();
+  const brief = $('popupBrief').value.trim();
+  const width = $('popupWidth').valueAsNumber;
+  const height = $('popupHeight').valueAsNumber;
+  const error = $('popupBuilderError');
+  const submit = $('createPopup');
+  error.textContent = '';
+  const copy = readPopupCopy(brief, $('popupHeadline').value.trim(), $('popupBody').value.trim());
+  if (!brief && !copy.headline && !copy.detail) {
+    error.textContent = 'ใส่บรีฟหรือข้อความก่อนสร้าง Popup';
+    $('popupBrief').focus();
+    return;
+  }
+  if (!copy.headline && !copy.detail) {
+    error.textContent = 'ใส่หัวข้อที่ต้องการให้แสดงใน Popup';
+    return;
+  }
+  const urlField = $('popupButtonUrl').value.trim();
+  const url = safeUrl(urlField);
+  if (urlField && !url) {
+    error.textContent = 'ลิงก์ปลายทางต้องขึ้นต้นด้วย https:// หรือ http://';
+    return;
+  }
+  const label = $('popupButtonLabel').value.trim();
+  const buttonRequested = /มีปุ่ม|ใส่ปุ่ม|เพิ่มปุ่ม|with a button/i.test(brief);
+  const button = url || label || buttonRequested ? { text: label || 'ดูรายละเอียด', url } : null;
+  const referenceFile = $('popupReference').files[0];
+  const backgroundFile = $('popupBackground').files[0];
+  const logoFile = $('popupLogo').files[0];
+  const useAi = $('popupUseAi').checked && !backgroundFile;
+  const imageBrief = $('popupAiPrompt').value.trim() || brief || [copy.headline, copy.detail].filter(Boolean).join(' ');
+  submit.disabled = true;
+  try {
+    const reference = referenceFile ? samplePopupReference((await readImage(referenceFile)).image) : null;
+    const background = backgroundFile ? (await readImage(backgroundFile)).src : '';
+    const logo = logoFile ? await readImage(logoFile) : null;
+    const design = composePopup({ width, height, copy, button, background, reference, brief, logo });
+    stopPopupBackground();
+    remember();
+    state = design;
+    selected = design.items[0]?.id ?? null;
+    $('w').value = width;
+    $('h').value = height;
+    refresh();
+    $('popupBuilder').close();
+    notice('สร้าง Popup แล้ว แก้ข้อความ พื้นหลัง และปุ่มได้ก่อนส่งออก');
+    if (useAi) void generatePopupBackground(design, imageBrief);
+  } catch (problem) {
+    error.textContent = problem.message || 'สร้าง Popup ไม่สำเร็จ';
+  } finally {
+    submit.disabled = false;
+  }
+});
+
+
+let popupImageJob = null;
+
+function popupImageWorkerMain() {
+  self.addEventListener('message', async ({ data: prompt }) => {
+    try {
+      const adapter = await navigator.gpu?.requestAdapter();
+      if (!adapter) throw new Error('WebGPU adapter unavailable');
+      const { env, AutoProcessor, MultiModalityCausalLM } = await import(
+        'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.1/dist/transformers.min.js'
+      );
+      env.allowLocalModels = false;
+      env.backends.onnx.wasm.numThreads = 1;
+      const modelId = 'onnx-community/Janus-Pro-1B-ONNX';
+      const fp16 = adapter.features.has('shader-f16');
+      const visionDtype = fp16 ? 'fp16' : 'fp32';
+      const [processor, model] = await Promise.all([
+        AutoProcessor.from_pretrained(modelId),
+        MultiModalityCausalLM.from_pretrained(modelId, {
+          dtype: {
+            prepare_inputs_embeds: fp16 ? 'q4' : 'fp32',
+            language_model: fp16 ? 'q4f16' : 'q4',
+            lm_head: visionDtype, gen_head: visionDtype, gen_img_embeds: visionDtype, image_decode: 'fp32'
+          },
+          device: {
+            prepare_inputs_embeds: 'wasm', language_model: 'webgpu', lm_head: 'webgpu',
+            gen_head: 'webgpu', gen_img_embeds: 'webgpu', image_decode: 'webgpu'
+          }
+        })
+      ]);
+      self.postMessage({ phase: 'generating' });
+      const inputs = await processor([{ role: '<|User|>', content: prompt }], { chat_template: 'text_to_image' });
+      const count = processor.num_image_tokens;
+      const [image] = await model.generate_images({
+        ...inputs, do_sample: true, min_new_tokens: count, max_new_tokens: count
+      });
+      self.postMessage({ blob: await image.toBlob() });
+    } catch (error) {
+      self.postMessage({ error: String(error) });
+    }
+  }, { once: true });
+}
+
+function stopPopupBackground(message = '') {
+  const job = popupImageJob;
+  popupImageJob = null;
+  if (job) {
+    job.worker.terminate();
+    URL.revokeObjectURL(job.url);
+  }
+  $('cancelPopupAi').hidden = true;
+  $('popupAiStatus').textContent = message;
+}
+
+function generatePopupBackground(design, brief) {
+  const status = $('popupAiStatus');
+  if (!navigator.gpu || typeof OffscreenCanvas !== 'function') {
+    status.textContent = 'เครื่องนี้รันภาพ AI ไม่ได้ ใช้พื้นหลังที่จัดไว้หรืออัปโหลดรูปแทนได้';
+    return;
+  }
+  try {
+    const entry = '(' + popupImageWorkerMain.toString() + ')();';
+    const url = URL.createObjectURL(new Blob([entry], { type: 'text/javascript' }));
+    let worker;
+    try {
+      worker = new Worker(url, { type: 'module' });
+    } catch (error) {
+      URL.revokeObjectURL(url);
+      throw error;
+    }
+    const job = { worker, url };
+    popupImageJob = job;
+    status.textContent = 'กำลังโหลดโมเดลสร้างภาพ AI…';
+    $('cancelPopupAi').hidden = false;
+    const fail = error => {
+      console.warn('Popup image generation', error);
+      if (popupImageJob === job) stopPopupBackground('สร้างภาพ AI ไม่สำเร็จ คุณยังใช้พื้นหลังที่จัดไว้ได้');
+    };
+    worker.onerror = fail;
+    worker.onmessage = async ({ data }) => {
+      if (popupImageJob !== job) return;
+      if (data.error) return fail(data.error);
+      if (data.phase === 'generating') {
+        status.textContent = 'AI กำลังสร้างภาพพื้นหลังในเครื่อง…';
+        return;
+      }
+      try {
+        const file = new File([data.blob], 'popup-ai.png', { type: data.blob.type || 'image/png' });
+        const { src } = await readImage(file);
+        if (popupImageJob !== job) return;
+        if (state !== design || state.bgImage) return stopPopupBackground();
+        remember();
+        state.bgImage = src;
+        state.bgLayer = 'behind';
+        state.bgShade = Math.max(28, state.bgShade || 0);
+        refresh();
+        stopPopupBackground('ใช้ภาพพื้นหลัง AI แล้ว แก้ไขหรือส่งออกได้');
+      } catch (error) {
+        fail(error);
+      }
+    };
+    const orientation = design.w > design.h ? 'wide horizontal' : design.w < design.h ? 'vertical' : 'square';
+    const prompt = [
+      'Create a ' + orientation + ' background image for a professional website announcement.',
+      'Visual brief: ' + brief.slice(0, 600) + '.',
+      'Palette: ' + [design.bgA, design.bgB, design.bgAccent].join(', ') + '.',
+      'Quiet central negative space, tasteful detail toward outer edges. Background artwork only. No words, no logos, no buttons.'
+    ].join(' ');
+    worker.postMessage(prompt);
+  } catch (error) {
+    console.warn('Popup image generation', error);
+    stopPopupBackground('เปิดโมเดลสร้างภาพไม่ได้ คุณยังใช้พื้นหลังที่จัดไว้ได้');
+  }
+}
+
+$('cancelPopupAi').addEventListener('click', () => stopPopupBackground('หยุดสร้างภาพ AI แล้ว'));
+$('popupUseAi').addEventListener('change', () => { $('popupAiPromptWrap').hidden = !$('popupUseAi').checked; });
+
 refresh();
+openPopupBuilder();
 </script></body></html>
