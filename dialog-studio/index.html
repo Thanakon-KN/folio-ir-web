@@ -1,619 +1,58 @@
 <!doctype html>
-<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Dialog Studio</title>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dialog Studio · ออกแบบ Popup จากข้อความ</title>
 <style>
-:root {
-  color-scheme: light;
-  --ink: #202334;
-  --muted: #62677a;
-  --surface: #fff;
-  --field: #f8f8fc;
-  --line: #e2e4ee;
-  --accent: #5443c7;
-  --accent-soft: #eeebff;
-  --bar: #202134;
-  --header-height: 64px;
-}
-* { box-sizing: border-box; }
-[hidden], .hidden { display: none !important; }
-body { margin: 0; color: var(--ink); background: #f5f5fa; font: 14px/1.55 system-ui, "Segoe UI", Tahoma, sans-serif; }
-button, input, textarea, select { font: inherit; }
-button, summary { cursor: pointer; }
-button {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--ink);
-  padding: 8px 12px;
-  font-weight: 550;
-}
-button:hover { background: var(--field); border-color: #b8b2dd; }
-button:disabled { opacity: .42; cursor: default; }
-:focus-visible { outline: 2px solid #7663ee; outline-offset: 3px; }
-.primary { background: var(--accent); border-color: var(--accent); color: white; }
-.primary:hover { background: #4534b2; border-color: #4534b2; }
-.appbar {
-  min-height: var(--header-height);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 10px 24px;
-  background: var(--bar);
-  color: #fff;
-}
-.brand, .app-actions, .stage-actions, .art-title { display: flex; align-items: center; gap: 9px; }
-.brand { gap: 11px; white-space: nowrap; }
-.brand strong { font-size: 17px; letter-spacing: -.025em; }
-.logo { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; background: #c9bbff; }
-.logo::before { content: ""; width: 15px; height: 12px; border: 2px solid #343057; border-radius: 3px; box-shadow: inset 0 3px #343057; }
-.appbar .header-action { background: transparent; border-color: #4c4d63; color: #f2f1ff; }
-.appbar .header-action:hover { background: #35364f; }
-.appbar .primary { background: #c9bbff; border-color: #c9bbff; color: #24203d; }
-.appbar .primary:hover { background: #e0d6ff; }
-.appbar .primary span { margin-inline-start: 4px; }
-.layout {
-  display: grid;
-  grid-template-columns: clamp(246px, 21vw, 306px) minmax(0, 1fr) clamp(234px, 20vw, 280px);
-  height: calc(100dvh - var(--header-height));
-}
-aside { min-width: 0; background: var(--surface); overflow: auto; scrollbar-width: thin; }
-.left { border-right: 1px solid var(--line); }
-.right { border-left: 1px solid var(--line); padding: 17px 18px 24px; }
-.tool-nav {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 4px;
-  padding: 10px 10px 9px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--line);
-}
-.tool-nav button { border-color: transparent; background: transparent; color: var(--muted); padding-inline: 4px; }
-.tool-nav button:hover { background: var(--field); }
-.tool-nav button[aria-pressed="true"] { color: #422cae; background: var(--accent-soft); }
-.tool-panel { padding: 18px 16px 23px; }
-h2 { font-size: 15px; margin: 0 0 12px; }
-p { margin: 7px 0; color: var(--muted); font-size: 12px; }
-label { display: block; margin: 10px 0 5px; color: #4b5064; font-size: 12px; font-weight: 550; }
-label span { color: var(--accent); font-variant-numeric: tabular-nums; }
-input, select, textarea {
-  width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 7px;
-  background: var(--field); color: var(--ink); padding: 8px;
-}
-input:disabled { opacity: .45; }
-input[type="color"] { height: 37px; padding: 3px; }
-input[type="range"] { display: block; accent-color: var(--accent); margin: 4px 0 8px; padding: 0; }
-textarea { resize: vertical; min-height: 82px; }
-.grid, .group { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
-.tool, .block-action { width: 100%; }
-.tool { display: block; text-align: left; margin-bottom: 7px; }
-.tool span { display: inline-block; width: 22px; color: var(--accent); font-weight: 700; }
-.block-action { margin-top: 10px; }
-.seg { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; padding: 3px; background: #f0eff8; border-radius: 8px; }
-.seg button { border-color: transparent; background: transparent; padding: 5px 4px; color: var(--muted); font-size: 12px; }
-.seg button.active { border-color: var(--line); background: white; color: #422cae; }
-.upload { border: 1px dashed #bcb6da; border-radius: 8px; padding: 9px; background: #f8f7ff; cursor: pointer; }
-.upload input { display: block; margin-top: 5px; background: transparent; border: 0; padding: 2px 0; font-size: 11px; }
-.upload input::file-selector-button { border: 0; border-radius: 4px; padding: 4px 7px; margin-inline-end: 5px; background: var(--accent-soft); color: #422cae; cursor: pointer; }
-.panel-rule, .divider { border-top: 1px solid var(--line); margin: 18px 0; }
-.tool-panel details { border-bottom: 1px solid var(--line); }
-.tool-panel summary { padding: 11px 0; font-weight: 600; }
-.detail-body { padding-bottom: 12px; }
-.layer { display: grid; margin-bottom: 6px; }
-.layer button { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
-.layer .selected { background: var(--accent-soft); border-color: #b9acf4; color: #422cae; }
-.stage { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
-.stage-top {
-  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
-  gap: 8px; padding: 10px 14px; background: #fbfbfe; border-bottom: 1px solid var(--line);
-}
-.art-title { flex-wrap: wrap; gap: 6px 9px; }
-.art-title strong { font-size: 14px; }
-#dimensions, #selectionKind { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.stage-actions button { min-width: 34px; padding: 5px 8px; font-size: 16px; line-height: 1.45; }
-.size-control { position: relative; }
-.size-control summary {
-  list-style: none; white-space: nowrap; border: 1px solid var(--line); border-radius: 8px;
-  background: var(--surface); padding: 6px 8px; font-size: 12px;
-}
-.size-control summary::-webkit-details-marker { display: none; }
-.size-control summary::after { content: " ▾"; }
-.size-popover {
-  z-index: 2; position: absolute; inset: calc(100% + 7px) auto auto 0; width: 204px;
-  padding: 10px 12px 12px; border: 1px solid var(--line); border-radius: 9px;
-  background: var(--surface); box-shadow: 0 12px 28px #25234322;
-}
-.workspace {
-  display: grid;
-  place-items: center;
-  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
-  flex: 1 1 auto;
-  min-height: 0;
-  padding: clamp(12px, 2vw, 30px);
-  background: #e8e8f1 radial-gradient(#aaaac1 1px, transparent 1px) 50% 50% / 18px 18px;
-  overflow: hidden;
-  container-type: size;
-}
-canvas { display: block; }
-#art {
-  max-width: 100%;
-  max-height: 100cqh;
-  width: auto;
-  height: auto;
-  box-shadow: 0 20px 48px #25234332, 0 0 0 1px #39375124;
-  touch-action: none;
-}
-.stage-note {
-  display: flex; flex-wrap: wrap; gap: 4px 16px; padding: 8px 13px;
-  background: #fbfbfe; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px;
-}
-#status { color: #4a399c; overflow-wrap: anywhere; }
-.inspector-heading {
-  display: flex; align-items: center; justify-content: space-between; gap: 5px;
-  border-bottom: 1px solid var(--line); padding-bottom: 11px; margin-bottom: 12px;
-}
-.inspector-heading h2 { margin: 0; }
-#properties > .grid { margin-bottom: 3px; }
-#properties > div:first-child > label { margin-top: 0; }
-.right .group { grid-template-columns: repeat(auto-fit, minmax(56px, 1fr)); }
-.right .group button { font-size: 11px; padding: 7px 3px; }
-.empty { color: var(--muted); padding: 10px 0; }
-.export {
-  width: min(480px, calc(100% - 24px)); max-height: calc(100dvh - 24px); overflow: auto;
-  padding: 20px; border: 1px solid var(--line); border-radius: 14px;
-  color: var(--ink); background: var(--surface); box-shadow: 0 22px 75px #201b464d;
-}
-.export::backdrop { background: #1f1c3a80; }
-/* The brief and preview share the same workspace before opening the editor. */
-.appbar {
-  background: #fff;
-  color: #211f38;
-  border-bottom: 1px solid #e8e5f1;
-  padding-inline: clamp(16px, 3.2vw, 52px);
-}
-.appbar .header-action { color: #37334f; border-color: #e5e0f0; }
-.appbar .header-action:hover { background: #f3efff; }
-.appbar .primary { background: #5139ca; color: #fff; border-color: #5139ca; }
-.appbar .primary:hover { background: #4030a4; }
-.app-actions { margin-left: auto; }
-.studio-nav { display: flex; align-items: center; gap: 4px; padding: 3px; border-radius: 10px; background: #f2eff8; }
-.studio-nav button { background: transparent; border-color: transparent; color: #5e5675; padding: 5px 12px; }
-.studio-nav button[aria-current="page"] { background: #fff; border-color: #e7e0f3; color: #4730aa; }
-.builder-page {
-  --builder-text: #242039;
-  --builder-muted: #625a72;
-  min-height: calc(100dvh - var(--header-height));
-  background: radial-gradient(ellipse at 98% 0%, #eae4ff 0, transparent 40%), #f8f7fc;
-  color: var(--builder-text);
-  padding: clamp(25px, 4vw, 58px) clamp(16px, 4vw, 56px);
-}
-.builder-grid {
-  width: min(1260px, 100%);
-  display: grid;
-  grid-template-columns: minmax(350px, .9fr) minmax(0, 1.3fr);
-  gap: clamp(20px, 3vw, 48px);
-  margin: 0 auto;
-  align-items: start;
-}
-.builder-title {
-  margin: 0 0 8px;
-  color: #211936;
-  font-size: clamp(27px, 3.9vw, 57px);
-  font-weight: 750;
-  letter-spacing: -.04em;
-  line-height: 1.2;
-}
-.builder-intro { margin: 0 0 20px; color: var(--builder-muted); font-size: 14px; }
-.builder-form {
-  border: 1px solid #e9e3f2;
-  border-radius: 19px;
-  background: #fff;
-  padding: clamp(15px, 2vw, 24px);
-  box-shadow: 0 6px 20px #2d205107;
-}
-.builder-form fieldset { border: 0; padding: 0; margin: 0 0 14px; min-width: 0; }
-.builder-form legend { font-weight: 680; font-size: 13px; padding: 0; }
-.builder-form label { color: #3d354f; }
-.builder-form input, .builder-form textarea {
-  background: #fbfaff;
-  border-color: #e5e0ee;
-  border-radius: 9px;
-  padding: 9px 11px;
-}
-.builder-form input::placeholder, .builder-form textarea::placeholder { color: #7e778b; }
-.builder-form #popupBrief { min-height: 104px; }
-.builder-form details { border-top: 1px solid #eee9f5; padding: 10px 0; }
-.builder-form summary { color: #3e3554; font-size: 13px; font-weight: 650; }
-.builder-form details[open] summary { margin-bottom: 7px; }
-.builder-form .builder-check { display: flex; gap: 9px; align-items: center; font-weight: 650; margin: 0; }
-.builder-check input { width: auto; margin: 0; accent-color: #5139ca; }
-.builder-ai { background: #f8f5ff; border: 1px solid #eee7fc; padding: 10px 12px; border-radius: 10px; }
-.builder-ai p { color: var(--builder-muted); margin-bottom: 0; }
-.builder-actions { margin-top: 15px; }
-.builder-actions button { width: 100%; min-height: 45px; background: #5139ca; border-color: #5139ca; }
-.builder-actions button:hover { background: #402da4; }
-#popupBuilderError:not(:empty) { margin-top: 10px; color: #9e304e; }
-.builder-preview {
-  position: sticky;
-  top: 22px;
-  min-width: 0;
-  margin: 0;
-  overflow: hidden;
-  border-radius: 23px;
-  border: 1px solid #ddd4f1;
-  background: #fefcff;
-  box-shadow: 0 17px 50px #37265e10;
-}
-.builder-preview header, .builder-preview figcaption {
-  padding: 13px clamp(12px, 2vw, 22px);
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 5px 12px;
-}
-.builder-preview header { border-bottom: 1px solid #e9e2f3; }
-.builder-preview header h2 { margin: 0; font-size: 14px; }
-.builder-preview figcaption { color: var(--builder-muted); font-size: 12px; }
-.builder-preview figcaption span:last-child { font-variant-numeric: tabular-nums; }
-.preview-mode { color: #553ab0; font-size: 12px; font-weight: 650; }
-.builder-preview-board {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: clamp(290px, 41vw, 530px);
-  padding: 22px clamp(15px, 4vw, 60px);
-  background:
-    radial-gradient(ellipse at 75% 0%, #efe6ff 0, transparent 54%),
-    radial-gradient(#b9aed7 1px, transparent 1px) 50% 50% / 17px 17px,
-    #ece8f8;
-}
-#builderPreviewCanvas {
-  display: block;
-  max-width: 100%;
-  height: auto;
-  border-radius: 10px;
-  box-shadow: 0 18px 48px #241a4545, 0 0 0 1px #37275633;
-}
-@media (max-width: 800px) {
-  .builder-grid { grid-template-columns: minmax(0, 1fr); }
-  .builder-preview { position: static; }
-  .builder-preview-board { min-height: clamp(240px, 55vw, 430px); }
-}
-@media (max-width: 560px) {
-  .appbar { flex-wrap: wrap; }
-  .studio-nav { order: 2; width: 100%; }
-  .studio-nav button { flex: 1; }
-  .app-actions button { font-size: 12px; padding-inline: 7px; }
-}
-.stage-note #popupAiStatus { color: #4a399c; }
-#cancelPopupAi { padding: 3px 8px; font-size: 11px; }
-.export-heading { display: flex; justify-content: space-between; gap: 12px; }
-.export-heading h2 { font-size: 18px; margin-bottom: 4px; }
-.export-heading button { font-size: 20px; line-height: 1; }
-.export .group { margin-top: 12px; grid-template-columns: repeat(6, minmax(0, 1fr)); }
-.export .group button { grid-column: span 3; }
-.export .group [data-format] { grid-column: span 2; }
-#codeOutput { min-height: 120px; font: 12px/1.5 monospace; margin-top: 10px; }
-#exportStatus:empty { display: none; }
-@media (max-width: 860px) {
-  .layout { height: auto; grid-template-columns: minmax(225px, 1fr) minmax(225px, 1fr); }
-  .stage { grid-column: 1 / -1; grid-row: 1; }
-  .workspace { flex-basis: clamp(240px, 63vw, 480px); }
-  .right { border-left: 0; }
-  .left, .right { border-top: 1px solid var(--line); overflow: visible; }
-  .tool-nav { position: static; }
-}
-@media (max-width: 490px) {
-  .appbar { padding-inline: 10px; flex-wrap: wrap; gap: 8px; }
-  .app-actions { flex-wrap: wrap; gap: 4px; }
-  .app-actions button { padding-inline: 7px; font-size: 12px; }
-  .layout { grid-template-columns: minmax(0, 1fr); }
-  .left { border-right: 0; }
-  .stage-top { padding-inline: 10px; }
-  .size-popover { inset-inline-start: 0; }
-}
-</style></head><body>
-<header class="appbar">
-  <div class="brand"><span class="logo" aria-hidden="true"></span><strong>Dialog Studio</strong></div>
-  <nav class="studio-nav" aria-label="หน้าทำงาน">
-    <button id="openPopupBuilder" type="button" aria-current="page" aria-controls="popupBuilder">สร้าง Popup</button>
-    <button id="openStudioWorkspace" type="button" aria-controls="studioWorkspace">ปรับแต่ง</button>
-  </nav>
-  <div class="app-actions">
-    <button id="loadProject" class="header-action" type="button">เปิดงาน</button>
-    <button id="saveProject" class="header-action" type="button" hidden>บันทึกงาน</button>
-    <button id="openExport" class="primary" type="button" hidden>ส่งออก <span aria-hidden="true">↗</span></button>
-  </div>
-  <input id="projectFile" type="file" accept="application/json,.json" hidden>
-</header>
-<div id="studioWorkspace" class="layout" hidden>
-  <aside class="left" aria-label="เครื่องมือออกแบบ">
-    <nav class="tool-nav" aria-label="แผงเครื่องมือ">
-      <button type="button" aria-pressed="true" aria-controls="elementsPanel">เพิ่ม</button>
-      <button type="button" aria-pressed="false" aria-controls="backgroundPanel">พื้นหลัง</button>
-      <button type="button" aria-pressed="false" aria-controls="layersPanel">เลเยอร์</button>
-    </nav>
-    <section id="elementsPanel" class="tool-panel">
-      <h2>เพิ่มองค์ประกอบ</h2>
-      <button class="tool" id="addText"><span>T</span> เพิ่มกล่องข้อความ</button><button class="tool" id="addButton"><span>↗</span> เพิ่มปุ่มพร้อมลิงก์</button><label class="upload">เพิ่มรูปภาพ / โลโก้<input type="file" id="imageFile" accept="image/png,image/jpeg,image/webp"></label>
-      <div class="panel-rule"></div>
-      <h2>เพิ่มเนื้อหา</h2>
-      <div class="seg"><button id="guidedTab" class="active">กรอกตามช่อง</button><button id="pasteTab">วางข้อความ</button></div>
-<div id="guided"><label for="headingInput">หัวข้อหลัก</label><input id="headingInput" placeholder="ข้อความที่ต้องการให้เด่นที่สุด"><label for="bodyInput">รายละเอียด</label><textarea id="bodyInput" placeholder="ข้อมูลกิจกรรม หรือคำอธิบาย"></textarea></div>
-<div id="pasted" class="hidden"><label for="pasteInput">วางข้อความทั้งหมด</label><textarea id="pasteInput" placeholder="บรรทัดแรกเป็นหัวข้อ&#10;บรรทัดถัดไปเป็นรายละเอียด" style="min-height:145px"></textarea><p>ใช้บรรทัดแรกเป็นหัวข้อ เก็บข้อความที่เหลือเป็นรายละเอียด</p></div><button id="addContent" class="primary block-action">เพิ่มข้อความลงชิ้นงาน</button>
-    </section>
-    <section id="backgroundPanel" class="tool-panel" hidden>
-      <h2>ออกแบบพื้นหลัง</h2>
-      <details open><summary>ลวดลาย</summary>
-        <div class="detail-body">
-          <label for="patternCategory">หมวดลวดลาย</label>
-          <select id="patternCategory"><option value="">ทุกหมวด</option></select>
-          <details>
-            <summary>สีและความเข้มลวดลาย</summary>
-            <label for="bgAccent">สีลวดลาย</label>
-            <input id="bgAccent" type="color" value="#dcebc4">
-            <label for="bgIntensity">ความเข้ม <span id="bgIntensityValue">25%</span></label>
-            <input id="bgIntensity" type="range" min="0" max="70" value="25">
-            <button id="randomBg" type="button" class="block-action">สุ่มลวดลายใหม่</button>
-          </details>
-          <div id="patternGallery" role="group" aria-label="ตัวอย่างลวดลายพื้นหลัง"></div>
-        </div>
-      </details>
-      <details><summary>สีและความโปร่งใส</summary>
-        <div class="detail-body">
-          <label for="bgStyle">สไตล์สำเร็จรูป</label><select id="bgStyle"><option value="plain">เรียบ · ไล่สี</option><option value="corporate">องค์กร · เส้นเรขาคณิต</option><option value="luxury">เรียบหรู · เส้นโค้ง</option><option value="nature">ธรรมชาติ · รูปทรงออร์แกนิก</option><option value="tech">เทคโนโลยี · จุดและกริด</option><option value="celebration">เทศกาล · กระดาษโปรย</option></select>
-          <label for="bgFillMode">รูปแบบสีพื้น</label>
-          <select id="bgFillMode">
-            <option value="gradient">ไล่สีหลายสี</option>
-            <option value="solid">สีเดียวจากจานสี</option>
-            <option value="bands">แถบสีหลายสี</option>
-          </select>
-          <div id="bgPalettePreview" aria-hidden="true"></div>
-          <p id="bgPaletteHint"></p>
-          <div id="bgPalette" role="group" aria-label="จุดสีพื้นหลัง"></div>
-          <button id="addBgColor" type="button" class="block-action">＋ เพิ่มสี</button>
-          <div id="bgAngleControls">
-            <label for="bgAngle">ทิศทางสี <span id="bgAngleValue">135°</span></label>
-            <input id="bgAngle" type="range" min="0" max="360" value="135">
-          </div>
-          <label for="bgOpacity">ความทึบสี BG <span id="bgOpacityValue">100%</span></label>
-          <input id="bgOpacity" type="range" min="0" max="100" value="100">
-        </div>
-      </details>
-      <details><summary>รูปพื้นหลัง</summary>
-        <div class="detail-body"><label class="upload">อัปโหลดภาพ BG<input id="bgFile" type="file" accept="image/png,image/jpeg,image/webp"></label><label for="bgShade">เงาทับภาพ <span id="bgShadeValue">0%</span></label><input id="bgShade" type="range" min="0" max="80" value="0"><button id="clearBg" style="width:100%;margin-top:8px">ลบภาพ · ใช้พื้นหลังที่ออกแบบ</button></div>
-      </details>
-    </section>
-    <section id="layersPanel" class="tool-panel" hidden>
-      <h2>เลเยอร์</h2>
-      <div id="layers"></div>
-    </section>
-  </aside>
-  <main class="stage" aria-label="ชิ้นงาน">
-    <div class="stage-top">
-      <div class="art-title"><strong>ชิ้นงาน Popup</strong><span id="dimensions"></span></div>
-      <div class="stage-actions">
-        <details class="size-control">
-          <summary>ขนาดชิ้นงาน</summary>
-          <div class="size-popover"><div class="grid"><div><label for="w">กว้าง · px</label><input id="w" type="number" min="240" max="4000" value="1200"></div><div><label for="h">สูง · px</label><input id="h" type="number" min="180" max="4000" value="800"></div></div><button id="resize" class="block-action">ใช้ขนาดนี้</button></div>
-        </details>
-        <button id="undo" type="button" aria-label="ย้อนกลับ" title="ย้อนกลับ">↶</button>
-        <button id="redo" type="button" aria-label="ทำซ้ำ" title="ทำซ้ำ">↷</button>
-      </div>
-    </div>
-    <div class="workspace"><canvas id="art" width="1200" height="800" tabindex="0" aria-label="พื้นที่ออกแบบ คลิกเลือกและลากย้ายองค์ประกอบ ใช้ปุ่มลูกศรเพื่อขยับ"></canvas></div>
-    <div class="stage-note"><span>คลิกเลือก · ลากเพื่อย้าย</span><span id="status" role="status" aria-live="polite"></span><span id="popupAiStatus" role="status" aria-live="polite"></span><button id="cancelPopupAi" type="button" hidden>หยุดสร้างภาพ AI</button></div>
-  </main>
-  <aside class="right"><div class="inspector-heading"><h2>ปรับแต่ง</h2><span id="selectionKind"></span></div><div id="empty" class="empty">เลือกข้อความ รูปภาพ หรือปุ่มบนชิ้นงาน เพื่อปรับแต่งที่นี่</div><div id="properties" class="hidden"><div><label for="content">ข้อความ</label><textarea id="content"></textarea></div><div id="urlWrap"><label for="url">ลิงก์ปลายทางปุ่ม</label><input id="url" placeholder="https://example.com"></div><div><label>ตำแหน่ง · px</label><div class="grid"><input id="x" type="number" aria-label="ตำแหน่ง X"><input id="y" type="number" aria-label="ตำแหน่ง Y"></div></div><div><label>ขนาดกล่อง · px</label><div class="grid"><input id="ew" type="number" min="20" aria-label="ความกว้างองค์ประกอบ"><input id="eh" type="number" min="20" aria-label="ความสูงองค์ประกอบ"></div></div><div id="fontWrap"><label for="fontSize">ขนาดตัวอักษร · px</label><input id="fontSize" type="number" min="8" max="400"></div><div><label for="color">สีตัวอักษร</label><input id="color" type="color"></div><div id="fillWrap"><label for="fill">สีปุ่ม</label><input id="fill" type="color"></div><div><label for="align">จัดแนวข้อความ</label><select id="align"><option value="left">ชิดซ้าย</option><option value="center">กึ่งกลาง</option><option value="right">ชิดขวา</option></select></div><div><label for="weight">น้ำหนักตัวอักษร</label><select id="weight"><option value="400">ปกติ</option><option value="700">หนา</option></select></div><div><label>จัดวางและลำดับ</label><div class="group"><button id="center">จัดกลาง</button><button id="forward">ขึ้นหน้า</button><button id="backward">ลงหลัง</button></div></div><div><div class="divider"></div><div class="group"><button id="duplicate">ทำสำเนา</button><button id="delete">ลบ</button></div></div></div></aside>
+*{box-sizing:border-box}
+:root{color-scheme:light;--ink:#152137;--muted:#52647a;--line:#d9dfe8;--blue:#214fd1;--paper:#fff;font:16px/1.55 Inter,"Segoe UI",Tahoma,sans-serif;color:var(--ink);background:#f5f7fa}
+body{margin:0}header,main{width:min(1480px,100%);margin:auto}header{height:74px;display:flex;align-items:center;gap:13px;padding:0 clamp(18px,4vw,66px)}.top{border-bottom:1px solid var(--line);background:white}
+.brand{font-size:21px;font-weight:750;letter-spacing:-.7px}.mark{width:33px;height:33px;background:var(--blue);border-radius:9px;display:grid;place-content:center;color:white;font:750 23px Georgia}.context{margin-left:auto;font-size:14px;color:var(--muted)}
+main{padding:clamp(24px,3vw,46px) clamp(18px,4vw,66px) 40px}h1,h2,p{margin:0}h1{font-size:clamp(27px,3vw,43px);line-height:1.2;letter-spacing:-1.3px}.intro p{color:var(--muted);margin-top:7px}.desk{margin-top:24px;display:grid;grid-template-columns:minmax(300px,.77fr) minmax(0,1.55fr);gap:22px;align-items:start}.card{border:1px solid var(--line);border-radius:18px;background:var(--paper);overflow:hidden}
+.settings{padding:clamp(18px,2vw,29px)}h2{font-size:20px;letter-spacing:-.4px}.group{margin-top:21px}.label,summary{font-weight:650;font-size:15px}.sizes{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:end}.times{padding-bottom:12px;color:var(--muted)}
+.field{display:block;position:relative}.field input{padding-right:35px}.unit{position:absolute;right:12px;bottom:11px;font-size:13px;color:var(--muted);pointer-events:none}
+input,textarea,select,button{font:inherit}input,textarea,select{border:1px solid #c4ceda;border-radius:9px;background:#fff;color:var(--ink)}input,textarea{display:block;width:100%;min-width:0;padding:9px 12px;margin-top:6px}textarea{resize:vertical;line-height:1.65;min-height:165px}textarea::placeholder,input::placeholder{color:#748397}.labelrow,.bar,.actions,.exports{display:flex;align-items:center;gap:10px}.labelrow,.bar{justify-content:space-between}.bar{padding:16px 20px;border-bottom:1px solid var(--line)}.meta{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}.actions{justify-content:space-between;padding:14px 18px;border-top:1px solid var(--line);flex-wrap:wrap}
+button,select{cursor:pointer}button{font-weight:650;border-radius:8px;border:1px solid var(--line);padding:8px 13px;background:white;color:var(--ink)}button:hover:not(:disabled){background:#edf2ff}button:disabled{opacity:.42;cursor:default}.sample{padding:2px 0;color:var(--blue);border:0;font-size:14px}.primary{color:white;background:var(--blue);border-color:var(--blue)}.primary:hover:not(:disabled){background:#183ea8}select{padding:8px 28px 8px 10px;appearance:none;background:linear-gradient(45deg,transparent 50%,#53627a 50%) calc(100% - 14px) 51%/5px 5px no-repeat,linear-gradient(135deg,#53627a 50%,transparent 50%) calc(100% - 9px) 51%/5px 5px no-repeat}
+:focus-visible{outline:3px solid #789cff;outline-offset:2px}details{border-top:1px solid var(--line);padding-top:16px;margin-top:20px}summary{cursor:pointer}details label{display:block;margin-top:12px}
+.stage{padding:clamp(18px,3vw,45px);background-color:#ebeff5;background-image:radial-gradient(#bbc7d6 1px,transparent 1px);background-size:14px 14px;min-height:340px;height:clamp(340px,49vh,550px);display:grid;place-items:center;overflow:hidden}canvas{display:block;width:100%;height:100%;min-width:0;min-height:0;object-fit:contain;filter:drop-shadow(0 7px 10px #142c572c)}.notice{font-size:14px;color:#8b361d;margin:12px 0 0}.status{padding:0 18px 12px;font-size:14px;color:var(--muted)}.status:empty,.notice:empty{display:none}
+@media(max-width:850px){.desk{grid-template-columns: minmax(250px,.85fr) minmax(0,1.25fr);gap:12px}.actions{padding:12px}.stage{padding:16px}.bar{padding:15px}}
+@media(max-width:690px){header{height:60px}.desk{grid-template-columns:1fr}.stage{height:310px;min-height:0}.settings{padding:18px}.context{display:none}textarea{min-height:110px}.group{margin-top:15px}.actions{gap:8px}.intro p{font-size:15px}}
+</style>
+</head>
+<body>
+<div class="top"><header><span class="mark" aria-hidden="true">d</span><span class="brand" lang="en">Dialog Studio</span><span class="context">ออกแบบ Popup</span></header></div>
+<main>
+<div class="intro"><h1>สร้าง Popup จากข้อความ</h1><p>กำหนดขนาดแล้ววางข้อความ พรีวิวจะจัดหน้าให้ทันที</p></div>
+<div class="desk">
+<section class="card settings" aria-labelledby="settingsTitle">
+<h2 id="settingsTitle">ตั้งค่าชิ้นงาน</h2>
+<div class="group sizes">
+<label class="field"><span class="label">ความกว้าง</span><input id="width" type="number" min="240" max="4000" step="1" value="1200"><span class="unit" aria-hidden="true">px</span></label>
+<span class="times" aria-hidden="true">×</span>
+<label class="field"><span class="label">ความสูง</span><input id="height" type="number" min="180" max="4000" step="1" value="800"><span class="unit" aria-hidden="true">px</span></label>
 </div>
-<main id="popupBuilder" class="builder-page" aria-labelledby="popupBuilderTitle">
-  <div class="builder-grid">
-    <section aria-labelledby="popupBuilderTitle">
-      <h1 id="popupBuilderTitle" class="builder-title">สร้าง Popup จากบรีฟ</h1>
-      <p class="builder-intro">กำหนดขนาดและใส่เนื้อหา แล้วดูแบบที่เว็บจัดให้</p>
-  <form id="popupBuilderForm" class="builder-form">
-    <fieldset><legend>ขนาดชิ้นงาน</legend>
-    <div class="grid">
-      <div><label for="popupWidth">ความกว้าง (px)</label><input id="popupWidth" type="number" required min="240" max="4000" step="1" placeholder="1200"></div>
-      <div><label for="popupHeight">ความสูง (px)</label><input id="popupHeight" type="number" required min="180" max="4000" step="1" placeholder="800"></div>
-    </div>
-    </fieldset>
-    <label for="popupBrief">บรีฟหรือข้อความที่ต้องการแสดง</label>
-    <textarea id="popupBrief" maxlength="1600" placeholder="เช่น เชิญผู้ถือหุ้นเสนอวาระประชุม AGM&#10;พื้นหลังห้องประชุมโทนแดงเข้ม ดูเป็นทางการ"></textarea>
-    <details>
-      <summary>ข้อความพร้อมใช้และลิงก์ปุ่ม</summary>
-      <label for="popupHeadline">หัวข้อพร้อมใช้</label><input id="popupHeadline" maxlength="220">
-      <label for="popupBody">รายละเอียดพร้อมใช้</label><textarea id="popupBody" maxlength="1000"></textarea>
-      <div class="grid">
-        <div><label for="popupButtonLabel">ข้อความปุ่ม</label><input id="popupButtonLabel" maxlength="80"></div>
-        <div><label for="popupButtonUrl">URL ปลายทาง</label><input id="popupButtonUrl" type="url" placeholder="https://"></div>
-      </div>
-    </details>
-    <details>
-      <summary>รูปอ้างอิงหรือรูปที่จะใช้</summary>
-      <label for="popupReference">ภาพอ้างอิงสำหรับโทนสี</label>
-      <input id="popupReference" type="file" accept="image/png,image/jpeg,image/webp">
-      <label for="popupBackground">รูปที่ใช้เป็นพื้นหลังจริง</label>
-      <input id="popupBackground" type="file" accept="image/png,image/jpeg,image/webp">
-      <label for="popupLogo">โลโก้ที่จะวางบน Popup</label>
-      <input id="popupLogo" type="file" accept="image/png,image/jpeg,image/webp">
-    </details>
-    <div class="builder-ai">
-    <label class="builder-check"><input id="popupUseAi" type="checkbox"> สร้างภาพพื้นหลังด้วย AI</label>
-    <div id="popupAiPromptWrap" hidden><label for="popupAiPrompt">คำอธิบายภาพเพิ่มเติม (ถ้ามี)</label><input id="popupAiPrompt" maxlength="360" placeholder="เช่น Dark red boardroom, soft lighting, empty center"></div>
-    <p>ครั้งแรกต้องโหลดโมเดลและใช้เครื่องที่รองรับ WebGPU ถ้ามีรูปพื้นหลังที่อัปโหลด เว็บจะใช้รูปนั้น</p>
-    </div>
-    <div id="popupBuilderError" role="alert"></div>
-    <div class="builder-actions"><button id="createPopup" class="primary" type="submit">สร้างและเปิด Studio <span aria-hidden="true">↗</span></button></div>
-  </form>
-    </section>
-    <figure class="builder-preview">
-      <header><h2>ตัวอย่างชิ้นงาน</h2><span id="builderPreviewMode" class="preview-mode">แบบตัวอย่าง</span></header>
-      <div class="builder-preview-board"><canvas id="builderPreviewCanvas" width="640" height="420" aria-label="ภาพตัวอย่าง Popup"></canvas></div>
-      <figcaption><span id="builderPreviewNote">ใส่ขนาดและบรีฟเพื่อดูแบบของคุณ</span><span id="builderPreviewSize"></span></figcaption>
-    </figure>
-  </div>
-</main>
-<dialog id="exportDialog" class="export" aria-labelledby="exportTitle">
-  <div class="export-heading">
-    <div><h2 id="exportTitle">ส่งออกชิ้นงาน</h2><p>ดาวน์โหลดเป็นภาพ หรือเลือก HTML เพื่อให้ปุ่มคลิกได้</p></div>
-    <form method="dialog"><button type="submit" autofocus aria-label="ปิดหน้าต่างส่งออก">×</button></form>
-  </div>
-  <div class="group"><button data-format="image/png">PNG</button><button data-format="image/jpeg">JPG</button><button data-format="image/webp">WebP</button><button id="exportHtml" class="primary">ดาวน์โหลด HTML</button><button id="showCode">ดูโค้ด</button></div><textarea id="codeOutput" readonly class="hidden" aria-label="โค้ด HTML สำหรับนำไปใช้"></textarea>
-  <p id="exportStatus" role="status" aria-live="polite"></p>
-</dialog>
+<div class="group"><div class="labelrow"><label for="copy" class="label">ข้อความบน Popup</label><button class="sample" id="sample" type="button">ใช้ข้อความตัวอย่าง</button></div>
+<textarea id="copy" rows="5" placeholder="วางหัวข้อและรายละเอียดไว้ที่นี่"></textarea></div>
+<details><summary>เพิ่มปุ่มและลิงก์</summary>
+<label class="label" for="buttonText">ข้อความบนปุ่ม</label><input id="buttonText" placeholder="เช่น ดูรายละเอียด">
+<label class="label" for="buttonUrl">ลิงก์ปลายทาง</label><input id="buttonUrl" type="url" placeholder="https://…">
+</details>
+<p id="warning" class="notice" role="status"></p>
+</section>
+<section class="card" aria-labelledby="previewTitle">
+<div class="bar"><h2 id="previewTitle">พรีวิว</h2><span class="meta" id="dimensions"></span></div>
+<div class="stage"><canvas id="art" aria-label="ตัวอย่าง Popup"></canvas></div>
+<div class="actions"><button id="variation" type="button">เปลี่ยนดีไซน์</button><div class="exports"><select id="format" aria-label="รูปแบบไฟล์"><option>PNG</option><option>JPG</option><option>WebP</option><option>HTML</option></select><button class="primary" id="download" type="button">ดาวน์โหลด</button></div></div>
+<p class="status" id="status" role="status"></p>
+</section>
+</div></main>
 <script>
-const $=id=>document.getElementById(id),canvas=$('art'),ctx=canvas.getContext('2d');
-let state={w:1200,h:800,bgA:'#173e37',bgB:'#6b8b70',bgImage:'',items:[{id:1,type:'text',text:'YOUR NEXT CHAPTER',x:140,y:200,w:920,h:85,size:54,color:'#ffffff',align:'center',weight:'700'},{id:2,type:'text',text:'เริ่มต้นเรื่องราวใหม่ของคุณ\nออกแบบข้อความ พื้นหลัง และปุ่มได้ด้วยตัวเอง',x:170,y:320,w:860,h:130,size:30,color:'#ffffff',align:'center',weight:'400'},{id:3,type:'button',text:'ดูรายละเอียด',url:'https://example.com',x:450,y:520,w:300,h:76,size:26,color:'#173e37',fill:'#f5f3df',align:'center',weight:'700'}]},selected=1,history=[],future=[],drag=null,mode='guided',images=new Map();
-function notice(text) {
-  $('status').textContent = text;
-  if ($('exportDialog').open) $('exportStatus').textContent = text;
-}
-function snapshot(){return JSON.stringify(state)}function remember(){history.push(snapshot());if(history.length>40)history.shift();future=[]}function current(){return state.items.find(i=>i.id===selected)}function uid(){return Date.now()+Math.random()}
-function imageFor(src){if(!src)return null;if(!images.has(src)){const image=new Image();images.set(src,image);image.onload=()=>draw();image.src=src}const image=images.get(src);return image.complete&&image.naturalWidth?image:null}
-const imageShapes = {
-  rectangle: 'สี่เหลี่ยม',
-  rounded: 'มุมมน',
-  circle: 'วงกลม',
-  ellipse: 'วงรี',
-  diamond: 'ข้าวหลามตัด',
-  hexagon: 'หกเหลี่ยม',
-  arch: 'ซุ้มโค้ง',
-  heart: 'หัวใจ',
-  polygon: 'กำหนดเอง'
-};
-
-function imageShape(item) {
-  return Object.hasOwn(imageShapes, item.imageShape) ? item.imageShape : 'rectangle';
-}
-
-function imageShapeBounds(item, shape) {
-  const { x, y, w, h } = item;
-  if (shape !== 'circle') return { x, y, w, h };
-  const diameter = Math.min(w, h);
-  return { x: x + (w - diameter) / 2, y: y + (h - diameter) / 2, w: diameter, h: diameter };
-}
-
-const MAX_FRAME_POINTS = 16;
-const defaultFramePoints = [
-  { x: 20, y: 0 }, { x: 80, y: 0 }, { x: 100, y: 50 },
-  { x: 80, y: 100 }, { x: 20, y: 100 }, { x: 0, y: 50 }
-];
-
-function framePoints(item) {
-  const points = item.framePoints;
-  if (Array.isArray(points) && points.length >= 3 && points.length <= MAX_FRAME_POINTS &&
-      points.every(point => point && ['x', 'y'].every(axis =>
-        Number.isFinite(point[axis]) && point[axis] >= 0 && point[axis] <= 100))) return points;
-  return defaultFramePoints;
-}
-
-function imageClipPath(shape, { x, y, w, h }, item = {}) {
-  const path = new Path2D();
-  if (shape === 'polygon') {
-    for (const point of framePoints(item)) {
-      path.lineTo(x + w * point.x / 100, y + h * point.y / 100);
-    }
-  } else if (shape === 'rounded') {
-    const shortSide = Math.min(w, h);
-    const radius = imageCropValue(item, 'frameRadius', 36, 0, 100) * shortSide / 200;
-    path.roundRect(x, y, w, h, radius);
-  } else if (shape === 'circle' || shape === 'ellipse') {
-    path.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
-  } else if (shape === 'diamond') {
-    path.moveTo(x + w / 2, y);
-    path.lineTo(x + w, y + h / 2);
-    path.lineTo(x + w / 2, y + h);
-    path.lineTo(x, y + h / 2);
-  } else if (shape === 'hexagon') {
-    path.moveTo(x + w * .25, y);
-    path.lineTo(x + w * .75, y);
-    path.lineTo(x + w, y + h / 2);
-    path.lineTo(x + w * .75, y + h);
-    path.lineTo(x + w * .25, y + h);
-    path.lineTo(x, y + h / 2);
-  } else if (shape === 'arch') {
-    path.ellipse(x + w / 2, y + h * .48, w / 2, h * .48, 0, Math.PI, Math.PI * 2);
-    path.lineTo(x + w, y + h);
-    path.lineTo(x, y + h);
-  } else if (shape === 'heart') {
-    path.moveTo(x + w / 2, y + h * .22);
-    path.bezierCurveTo(x + w * .24, y - h * .18, x, y + h * .04, x, y + h * .38);
-    path.bezierCurveTo(x, y + h * .65, x + w * .34, y + h * .88, x + w / 2, y + h);
-    path.bezierCurveTo(x + w * .66, y + h * .88, x + w, y + h * .65, x + w, y + h * .38);
-    path.bezierCurveTo(x + w, y + h * .04, x + w * .76, y - h * .18, x + w / 2, y + h * .22);
-  } else {
-    path.rect(x, y, w, h);
-  }
-  path.closePath();
-  return path;
-}
-
-function imageCropValue(item, key, fallback, min, max) {
-  const value = item[key];
-  return Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback;
-}
-
-function drawCover(context, image, { x, y, w, h }, zoom = 1, panX = .5, panY = .5) {
-  const scale = Math.max(w / image.width, h / image.height) * zoom;
-  const imageWidth = image.width * scale;
-  const imageHeight = image.height * scale;
-  context.drawImage(image, x + (w - imageWidth) * panX, y + (h - imageHeight) * panY, imageWidth, imageHeight);
-}
-
-function cover(context, image, x, y, w, h) {
-  context.save();
-  context.beginPath();
-  context.rect(x, y, w, h);
-  context.clip();
-  drawCover(context, image, { x, y, w, h });
-  context.restore();
-}
-
-function paintImage(context, item) {
-  const image = imageFor(item.src);
-  if (!image || item.w <= 0 || item.h <= 0) return;
-  const shape = imageShape(item);
-  const bounds = imageShapeBounds(item, shape);
-  const path = imageClipPath(shape, bounds, item);
-  context.clip(path);
-  const zoom = imageCropValue(item, 'cropZoom', 100, 100, 300) / 100;
-  const panX = imageCropValue(item, 'cropX', 50, 0, 100) / 100;
-  const panY = imageCropValue(item, 'cropY', 50, 0, 100) / 100;
-  const angle = imageCropValue(item, 'cropRotation', 0, -180, 180) * Math.PI / 180;
-  if (angle || item.cropFlipX || item.cropFlipY) {
-    // Cover the shape even after the source image has been rotated.
-    const cos = Math.abs(Math.cos(angle));
-    const sin = Math.abs(Math.sin(angle));
-    const w = bounds.w * cos + bounds.h * sin;
-    const h = bounds.w * sin + bounds.h * cos;
-    context.save();
-    context.translate(bounds.x + bounds.w / 2, bounds.y + bounds.h / 2);
-    context.rotate(angle);
-    context.scale(item.cropFlipX ? -1 : 1, item.cropFlipY ? -1 : 1);
-    drawCover(context, image, { x: -w / 2, y: -h / 2, w, h }, zoom, panX, panY);
-    context.restore();
-  } else {
-    drawCover(context, image, bounds, zoom, panX, panY);
-  }
-  const border = imageCropValue(item, 'frameBorder', 0, 0, 100);
-  if (border > 0) {
-    context.lineWidth = border * 2;
-    context.lineJoin = 'round';
-    context.strokeStyle = /^#[\da-f]{6}$/i.test(item.frameBorderColor) ? item.frameBorderColor : '#ffffff';
-    context.stroke(path);
-  }
-}
-
-function itemContainsPoint(item, { x, y }) {
-  if (x < item.x || x > item.x + item.w || y < item.y || y > item.y + item.h) return false;
-  if (item.type !== 'image' || imageShape(item) === 'rectangle') return true;
-  const shape = imageShape(item);
-  return ctx.isPointInPath(imageClipPath(shape, imageShapeBounds(item, shape), item), x, y);
-}
+'use strict';
+const byId = id => document.getElementById(id);
+const canvas = byId('art');
+const ctx = canvas.getContext('2d');
+const example = 'เปิดโอกาสให้ผู้ถือหุ้นเสนอวาระการประชุม\nขอเชิญผู้ถือหุ้นเสนอวาระและรายชื่อบุคคลเพื่อเข้ารับการพิจารณาเลือกตั้งเป็นกรรมการ สำหรับการประชุมสามัญผู้ถือหุ้น ประจำปี 2570';
 const wordBreaker = typeof Intl.Segmenter === 'function' ? new Intl.Segmenter('th', { granularity: 'word' }) : null;
 const graphemeBreaker = wordBreaker && new Intl.Segmenter('th', { granularity: 'grapheme' });
 
@@ -657,1435 +96,211 @@ function linesFor(context, text, width) {
   }
   return lines;
 }
-// New motifs share a scale based on the short side, so they work on tall and wide popups.
-const tilePatterns = {
-  hex(context, size) {
-    for (let side = 0; side < 6; side++) {
-      const angle = Math.PI / 3 * side;
-      context.lineTo(Math.cos(angle) * size * .5, Math.sin(angle) * size * .5);
+
+const font = 'Arial,"Leelawadee UI",Tahoma,sans-serif';
+const setFont = (weight, size) => { ctx.font = weight + ' ' + size + 'px ' + font; };
+let variation = 0;
+let pendingFrame = 0;
+let artwork = null;
+
+function splitCopy(value) {
+  const text = value.trim().replace(/\r\n?/g, '\n');
+  const lineBreak = text.indexOf('\n');
+  if (lineBreak > 0) return [text.slice(0, lineBreak), text.slice(lineBreak).trimStart()];
+  const sentence = /^(.{5,}?[.!?。！？])(?:\s+|(?=[ก-๙]))/u.exec(text);
+  if (sentence) return [sentence[1], text.slice(sentence[0].length)];
+  if (text.length <= 62) return [text, ''];
+  const lead = text.slice(0, 82);
+  const breaks = Array.from(lead.matchAll(/\s+|(?=เพื่อ|โดย|สำหรับ|ตั้งแต่|เนื่องจาก|พร้อมทั้ง|ขอเชิญ)/gu))
+    .filter(part => part.index >= 18);
+  let boundary = breaks[0]?.index;
+  if (!boundary && wordBreaker) {
+    const words = Array.from(wordBreaker.segment(text.slice(0, 110)));
+    boundary = words.find(word => word.index >= 44)?.index;
+  }
+  return boundary ? [text.slice(0, boundary).trimEnd(), text.slice(boundary).trimStart()] : [text, ''];
+}
+
+function seedFrom(text) {
+  let seed = 2166136261;
+  for (const char of text) seed = Math.imul(seed ^ char.codePointAt(0), 16777619);
+  return seed >>> 0;
+}
+
+function paintBackdrop(w, h, text) {
+  const seed = seedFrom(text);
+  const base = /สิ่งแวดล้อม|ยั่งยืน|sustainab|green/i.test(text) ? 159 :
+    /เทศกาล|ฉลอง|festival/i.test(text) ? 325 :
+    /ประชุม|ผู้ถือหุ้น|shareholder/i.test(text) ? 218 : seed % 360;
+  const hue = (base + variation * 47) % 360;
+  const grad = ctx.createLinearGradient(0, 0, w, h * .82);
+  grad.addColorStop(0, 'hsl(' + hue + ' 59% 13%)');
+  grad.addColorStop(.64, 'hsl(' + hue + ' 60% 24%)');
+  grad.addColorStop(1, 'hsl(' + ((hue + 19) % 360) + ' 69% 40%)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+  ctx.save();
+  ctx.scale(w, h);
+  const shift = ((seed % 17) / 100 + variation * .035) % .22;
+  ctx.lineWidth = .0015;
+  for (let i = 0; i < 85; i++) {
+    const t = i / 84;
+    ctx.strokeStyle = 'hsla(' + ((hue + 35) % 360) + ',93%,81%,' + (.12 + .45 * t) + ')';
+    ctx.beginPath();
+    ctx.moveTo(.56 + t * .33 + shift, -.15);
+    ctx.bezierCurveTo(1.49 - t * .19, .32, .40 + t * .5, .40 + t * .55, 1.08 + t * .15, 1.12);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function measureLayout(w, h, title, body, button) {
+  const short = Math.min(w, h);
+  const x = Math.round(w * .085);
+  const textWidth = w - 2 * x;
+  const maxHeight = h * .81;
+  const start = Math.max(15, Math.min(200, Math.round(Math.min(w * .082, h * .117))));
+  const pad = Math.max(6, short * .026);
+  let smallest = 9, largest = start, best = null;
+  while (smallest <= largest) {
+    const size = Math.floor((smallest + largest) / 2);
+    const blocks = [];
+    let used = 0;
+    for (const [kind, text, px, weight] of [['title', title, size, 700], ['body', body, Math.max(9, size * .46), 400], ['button', button, Math.max(9, size * .38), 700]]) {
+      if (!text) continue;
+      const isButton = kind === 'button';
+      setFont(weight, px);
+      const lines = linesFor(ctx, text, textWidth - (isButton ? pad * 2 : 0));
+      const lineH = px * 1.5;
+      const bh = lineH * lines.length + (isButton ? pad * .8 : 0);
+      const bw = isButton ? Math.min(textWidth, Math.max(...lines.map(line => ctx.measureText(line).width)) + 2 * pad) : textWidth;
+      if (blocks.length) used += Math.max(4, size * (isButton ? .48 : .31));
+      blocks.push({kind, lines, px, weight, w:bw, h:bh, x, y:used, lineH});
+      used += bh;
     }
-    context.closePath();
-  },
-  chevron(context, size) {
-    context.moveTo(-size * .48, -size * .2);
-    context.lineTo(0, size * .25);
-    context.lineTo(size * .48, -size * .2);
-  },
-  crosses(context, size) {
-    context.moveTo(-size * .24, 0);
-    context.lineTo(size * .24, 0);
-    context.moveTo(0, -size * .24);
-    context.lineTo(0, size * .24);
-  },
-  diamonds(context, size) {
-    context.moveTo(0, -size * .38);
-    context.lineTo(size * .28, 0);
-    context.lineTo(0, size * .38);
-    context.lineTo(-size * .28, 0);
-    context.closePath();
-  },
-  arches(context, size) {
-    context.arc(0, size * .2, size * .43, Math.PI, Math.PI * 2);
-    context.moveTo(-size * .27, size * .2);
-    context.arc(0, size * .2, size * .27, Math.PI, Math.PI * 2);
-  },
-  sparkles(context, size) {
-    context.moveTo(0, -size * .34);
-    context.quadraticCurveTo(size * .05, -size * .04, size * .28, 0);
-    context.quadraticCurveTo(size * .05, size * .04, 0, size * .34);
-    context.quadraticCurveTo(-size * .05, size * .04, -size * .28, 0);
-    context.quadraticCurveTo(-size * .05, -size * .04, 0, -size * .34);
+    if (used <= maxHeight) {
+      for (const block of blocks) block.y += (h - used) / 2;
+      best = blocks;
+      smallest = size + 1;
+    } else largest = size - 1;
   }
-};
+  return best;
+}
 
-function paintExtraPattern(context, pattern, width, height, random) {
-  const shortSide = Math.min(width, height);
-  const size = shortSide / 8;
-  const xOffset = random() * size;
-  const yOffset = random() * size;
-  context.lineWidth = Math.max(.65, shortSide / 500);
-
-  if (Object.hasOwn(tilePatterns, pattern)) {
-    const drawTile = tilePatterns[pattern];
-    const rowHeight = pattern === 'hex' ? size * .86 : size;
-    for (let row = 0, y = yOffset - size; y < height + size; y += rowHeight, row++) {
-      const offset = row % 2 ? size * .5 : 0;
-      for (let x = xOffset - 2 * size + offset; x < width + size; x += size) {
-        context.save();
-        context.translate(x, y);
-        context.beginPath();
-        drawTile(context, size);
-        context.stroke();
-        context.restore();
-      }
-    }
-  } else if (pattern === 'pinstripe') {
-    for (let x = xOffset % (size / 2); x < width; x += size / 2) {
-      context.fillRect(x, 0, context.lineWidth * 1.4, height);
-    }
-  } else if (pattern === 'checker') {
-    for (let row = 0, y = yOffset - size; y < height; y += size, row++) {
-      const offset = row % 2 ? size : 0;
-      for (let x = xOffset + offset - 2 * size; x < width; x += size * 2) {
-        context.fillRect(x, y, size, size);
-      }
-    }
-  } else if (pattern === 'bubbles' || pattern === 'grain') {
-    const fine = pattern === 'grain';
-    const count = fine ? 1400 : 42;
-    for (let index = 0; index < count; index++) {
-      const x = random() * width;
-      const y = random() * height;
-      const radius = size * (fine ? .012 + random() * .023 : .08 + random() * .5);
-      context.beginPath();
-      context.arc(x, y, radius, 0, Math.PI * 2);
-      if (fine) context.fill();
-      else context.stroke();
-    }
-  } else if (pattern === 'contours') {
-    const centerX = width * (.15 + random() * .7);
-    const centerY = height * (.15 + random() * .7);
-    const phase = random() * Math.PI * 2;
-    for (let ring = 1; ring <= 15; ring++) {
-      context.beginPath();
-      for (let point = 0; point <= 72; point++) {
-        const angle = point / 72 * Math.PI * 2;
-        const radius = ring * size * .46 * (1 + .16 * Math.sin(3 * angle + phase));
-        context.lineTo(centerX + Math.cos(angle) * radius, centerY + Math.sin(angle) * radius);
-      }
-      context.closePath();
-      context.stroke();
-    }
-  } else if (pattern === 'ribbons') {
-    const rise = (random() - .5) * height * .6;
-    for (let index = 0; index < 5; index++) {
-      const y = height * (.32 + index * .13);
-      context.beginPath();
-      context.moveTo(0, y);
-      context.bezierCurveTo(width * .28, y - height * .42, width * .68, y + height * .36, width, y + rise);
-      context.lineWidth = size * (.1 + index * .04);
-      context.stroke();
-    }
+function render() {
+  const w = byId('width').valueAsNumber, h = byId('height').valueAsNumber;
+  const input = byId('copy').value.trim();
+  const text = input || example;
+  const button = byId('buttonText').value.trim();
+  const link = byId('buttonUrl').value.trim();
+  let url = '', error = '', painted = false;
+  if (link) {
+    try { const target = new URL(link); if (['http:', 'https:'].includes(target.protocol)) url = target.href; } catch {}
   }
-}
-
-const MAX_BACKGROUND_COLORS = 8;
-
-function backgroundStops(design) {
-  const validColor = color => typeof color === 'string' && /^#[\da-f]{6}$/i.test(color);
-  const saved = Array.isArray(design.bgStops)
-    ? design.bgStops.slice(0, MAX_BACKGROUND_COLORS).filter(stop =>
-      validColor(stop?.color) && Number.isFinite(stop.position) && stop.position >= 0 && stop.position <= 100)
-    : [];
-  if (saved.length >= 2) return saved;
-  return [
-    { color: validColor(design.bgA) ? design.bgA : '#173e37', position: 0 },
-    { color: validColor(design.bgB) ? design.bgB : '#6b8b70', position: 100 }
-  ];
-}
-
-function solidColorIndex(design, stops) {
-  const index = design.bgSolidIndex;
-  return Number.isInteger(index) && index >= 0 && index < stops.length ? index : 0;
-}
-
-function backgroundFillStops(stops, mode) {
-  const sorted = [...stops].sort((a, b) => a.position - b.position);
-  if (mode !== 'bands') return sorted;
-  // Meeting halfway between the color positions keeps the edges sharp.
-  const edges = [{ color: sorted[0].color, position: 0 }];
-  for (let index = 1; index < sorted.length; index++) {
-    const previous = sorted[index - 1];
-    const next = sorted[index];
-    const position = (previous.position + next.position) / 2;
-    edges.push({ color: previous.color, position }, { color: next.color, position });
-  }
-  edges.push({ color: sorted.at(-1).color, position: 100 });
-  return edges;
-}
-
-function backgroundFill(context, design) {
-  const stops = backgroundStops(design);
-  if (design.bgFillMode === 'solid') return stops[solidColorIndex(design, stops)].color;
-  const { w, h } = design;
-  const angle = ((design.bgAngle ?? 135) - 90) * Math.PI / 180;
-  const dx = Math.cos(angle);
-  const dy = Math.sin(angle);
-  const radius = (Math.abs(w * dx) + Math.abs(h * dy)) / 2;
-  const gradient = context.createLinearGradient(
-    w / 2 - dx * radius, h / 2 - dy * radius, w / 2 + dx * radius, h / 2 + dy * radius
-  );
-  for (const { color, position } of backgroundFillStops(stops, design.bgFillMode)) {
-    gradient.addColorStop(position / 100, color);
-  }
-  return gradient;
-}
-
-function paintBackground(context, design = state){
- const { w, h } = design;
- const bg = imageFor(design.bgImage);
- const imageBehind = design.bgLayer === 'behind';
- context.clearRect(0,0,w,h);
- if(bg&&imageBehind)cover(context,bg,0,0,w,h);
- context.save();context.globalAlpha=(design.bgOpacity??100)/100*(bg&&imageBehind?(design.bgColorOpacity??40)/100:1);context.fillStyle=backgroundFill(context, design);context.fillRect(0,0,w,h);context.restore();
- if(bg&&!imageBehind)cover(context,bg,0,0,w,h);
- context.save();context.beginPath();context.rect(0,0,w,h);context.clip();context.globalAlpha=(design.bgIntensity??25)/100;context.strokeStyle=design.bgAccent||'#dcebc4';context.fillStyle=design.bgAccent||'#dcebc4';context.lineWidth=Math.max(1,w/700);
- let seed=(design.bgSeed??41)>>>0;const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296};const style=design.bgPattern??design.bgStyle??'plain';
- if(style==='diagonal'){const step=w/22,offset=(design.bgSeed??41)%step;for(let x=-h-w;x<w+h;x+=step){context.beginPath();context.moveTo(x+offset,0);context.lineTo(x+h+offset,h);context.stroke()}}
- if(style==='grid'){const step=w/20;for(let x=0;x<=w;x+=step){context.beginPath();context.moveTo(x,0);context.lineTo(x,h);context.stroke()}for(let y=0;y<=h;y+=step){context.beginPath();context.moveTo(0,y);context.lineTo(w,y);context.stroke()}}
- if(style==='waves'){const phase=((design.bgSeed??41)%100)/100*Math.PI*2;for(let n=0;n<12;n++){context.beginPath();for(let x=0;x<=w;x+=w/150){const y=h*(.08+n*.077)+Math.sin(x/w*Math.PI*3+phase)*h*.045;x===0?context.moveTo(x,y):context.lineTo(x,y)}context.stroke()}}
- if(style==='dots'){const step=w/28;for(let x=step/2;x<w;x+=step)for(let y=step/2;y<h;y+=step){context.beginPath();context.arc(x,y,w/800+1,0,Math.PI*2);context.fill()}}
- if(style==='frame'){for(let n=0;n<3;n++){const pad=w*(.025+n*.012);context.strokeRect(pad,pad,w-pad*2,h-pad*2)}}
- if(style==='rays'){const cx=w*(.1+random()*.8),cy=h*(.1+random()*.8);for(let n=0;n<40;n++){const a=n/40*Math.PI*2;context.beginPath();context.moveTo(cx,cy);context.lineTo(cx+Math.cos(a)*(w+h),cy+Math.sin(a)*(w+h));context.stroke()}}
- if(style==='corporate'){for(let n=0;n<14;n++){const left=n%2===0,x=left?random()*w*.18:w*(.82+random()*.18),y=random()*h,s=w*(.06+random()*.18);context.save();context.translate(x,y);context.rotate(Math.PI/4);context.strokeRect(-s/2,-s/2,s,s);context.restore()}}
- if(style==='luxury'){for(let n=0;n<18;n++){context.beginPath();context.ellipse(w*(n%2?1.08:-.08),h*.55,w*(.2+n*.012),h*(.3+n*.018),.2+random()*.2,0,Math.PI*2);context.stroke()}}
- if(style==='nature'){for(let n=0;n<18;n++){const x=n%2?w*(.87+random()*.13):w*random()*.13,y=random()*h;context.beginPath();context.ellipse(x,y,w*(.015+random()*.055),h*(.035+random()*.09),random()*Math.PI,0,Math.PI*2);context.fill()}}
- if(style==='tech'){const step=Math.max(22,w/25);for(let x=step/2;x<w;x+=step)for(let y=step/2;y<h;y+=step){if(x>w*.23&&x<w*.77&&y>h*.2&&y<h*.8)continue;context.beginPath();context.arc(x,y,Math.max(1.5,w/650),0,Math.PI*2);context.fill();if(random()>.72){context.beginPath();context.moveTo(x,y);context.lineTo(x+step,y);context.lineTo(x+step,y+step);context.stroke()}}}
- if(style==='celebration'){for(let n=0;n<100;n++){const x=random()*w,y=random()*h;if(x>w*.2&&x<w*.8&&y>h*.18&&y<h*.82)continue;context.save();context.translate(x,y);context.rotate(random()*Math.PI);if(n%3===0){context.beginPath();context.arc(0,0,w*.003,0,Math.PI*2);context.fill()}else context.fillRect(0,0,w*(.004+random()*.009),h*.006);context.restore()}}
- paintExtraPattern(context, style, w, h, random);
- context.restore();const shade=(design.bgShade??0)/100;if(shade){context.fillStyle=`rgba(0,0,0,${shade})`;context.fillRect(0,0,w,h)}
-}
-function paint(context,selection=false,design=state){paintBackground(context,design);
-for(const i of design.items){context.save();if(i.type==='image'){paintImage(context,i)}else{if(i.type==='button')paintButton(context,i);context.beginPath();context.rect(i.x,i.y,i.w,i.h);context.clip();context.font=`${i.weight} ${i.size}px Arial,"Segoe UI",sans-serif`;context.fillStyle=i.color;context.textBaseline='top';context.textAlign=i.align;const padding=i.type==='button'?12:0,lines=linesFor(context,i.text,Math.max(1,i.w-padding*2)),lh=i.size*1.35,total=lines.length*lh,x=i.align==='center'?i.x+i.w/2:i.align==='right'?i.x+i.w-padding:i.x+padding,y=i.type==='button'?i.y+(i.h-total)/2:i.y;lines.forEach((line,n)=>context.fillText(line,x,y+n*lh))}context.restore();if(selection&&i.id===selected){context.save();context.strokeStyle='#71d5b3';context.lineWidth=2*design.w/Math.max(1,canvas.clientWidth);context.setLineDash([8,5]);context.strokeRect(i.x,i.y,i.w,i.h);context.restore()}}
-}
-function paintButton(context,i){context.save();context.beginPath();const border=i.borderWidth??0,inset=border/2;context.roundRect(i.x+inset,i.y+inset,Math.max(1,i.w-border),Math.max(1,i.h-border),Math.max(0,Math.min(i.radius??0,i.w/2,i.h/2)));if(i.buttonStyle!=='outline'&&i.buttonStyle!=='text'){context.globalAlpha=(i.fillOpacity??100)/100;context.fillStyle=i.fill;if(i.buttonStyle==='gradient'){const g=context.createLinearGradient(i.x,i.y,i.x+i.w,i.y+i.h);g.addColorStop(0,i.fill);g.addColorStop(1,i.fillEnd||'#528b76');context.fillStyle=g}if(i.shadow){context.shadowColor='#00000040';context.shadowBlur=12;context.shadowOffsetY=5}context.fill()}context.shadowColor='transparent';context.globalAlpha=1;if(i.buttonStyle!=='text'&&(border>0||i.buttonStyle==='outline')){context.strokeStyle=i.borderColor||i.color;context.lineWidth=border||2;context.stroke()}context.restore()}
-function draw(){if(canvas.width!==state.w)canvas.width=state.w;if(canvas.height!==state.h)canvas.height=state.h;paint(ctx,true);$('dimensions').textContent=`${state.w} × ${state.h} px`;$('undo').disabled=!history.length;$('redo').disabled=!future.length}
-function panel(){const i=current();$('properties').classList.toggle('hidden',!i);$('empty').classList.toggle('hidden',!!i);if(i){for(const [id,key]of Object.entries({content:'text',url:'url',x:'x',y:'y',ew:'w',eh:'h',fontSize:'size',color:'color',fill:'fill',align:'align',weight:'weight'}))$(id).value=i[key]??'';$('urlWrap').classList.toggle('hidden',i.type!=='button');$('fillWrap').classList.toggle('hidden',i.type!=='button')}const layers=$('layers');layers.replaceChildren();[...state.items].reverse().forEach(item=>{const row=document.createElement('div');row.className='layer';const b=document.createElement('button');b.textContent=item.type==='image'?'รูปภาพ / โลโก้':item.text||'ข้อความว่าง';b.classList.toggle('selected',item.id===selected);b.onclick=()=>{selected=item.id;refresh()};row.append(b);layers.append(row)})}
-function refresh(){draw();panel();syncBackgroundControls()}
-function syncBackgroundControls(){for(const [id,fallback]of Object.entries({bgStyle:'plain',bgAccent:'#dcebc4',bgIntensity:25,bgAngle:135,bgShade:0,bgLayer:'front',bgColorOpacity:40})){if($(id))$(id).value=state[id]??fallback}$('bgIntensityValue').textContent=(state.bgIntensity??25)+'%';$('bgAngleValue').textContent=(state.bgAngle??135)+'°';$('bgShadeValue').textContent=(state.bgShade??0)+'%';if($('bgColorOpacityValue'))$('bgColorOpacityValue').textContent=(state.bgColorOpacity??40)+'%'}
-function add(item){remember();item.id=uid();state.items.push(item);selected=item.id;refresh()}
-function textItem(text,x=state.w*.1,y=state.h*.2,size=36){return{type:'text',text,x,y,w:state.w*.8,h:Math.min(state.h*.3,180),size,color:'#ffffff',weight:'400',align:'center'}}
-$('guidedTab').onclick=()=>switchMode('guided');$('pasteTab').onclick=()=>switchMode('paste');function switchMode(next){if(next===mode)return;if(next==='paste')$('pasteInput').value=[$('headingInput').value,$('bodyInput').value].filter(Boolean).join('\n');else{const [heading,...body]=$('pasteInput').value.split('\n');$('headingInput').value=heading||'';$('bodyInput').value=body.join('\n')}mode=next;$('guided').classList.toggle('hidden',mode!=='guided');$('pasted').classList.toggle('hidden',mode!=='paste');$('guidedTab').classList.toggle('active',mode==='guided');$('pasteTab').classList.toggle('active',mode==='paste')}
-$('addContent').onclick=()=>{let heading=$('headingInput').value,body=$('bodyInput').value;if(mode==='paste'){const parts=$('pasteInput').value.split('\n');heading=parts.shift();body=parts.join('\n')}if(!heading.trim()&&!body.trim())return notice('กรอกข้อความก่อนเพิ่มลงชิ้นงาน');remember();if(heading.trim()){const item=textItem(heading,state.w*.1,state.h*.22,Math.round(state.w*.043));item.weight='700';item.id=uid();state.items.push(item);selected=item.id}if(body.trim()){const item=textItem(body,state.w*.1,state.h*.43,Math.round(state.w*.025));item.id=uid();state.items.push(item);selected=item.id}refresh()};
-$('addText').onclick=()=>add(textItem('แก้ข้อความของคุณ'));$('addButton').onclick=()=>add({type:'button',text:'ดูเพิ่มเติม',url:'',x:state.w*.35,y:state.h*.7,w:state.w*.3,h:state.h*.1,size:26,color:'#173e37',fill:'#f5f3df',align:'center',weight:'700'});
-function readImage(file){return new Promise((resolve,reject)=>{if(!file||!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>10*1024*1024)return reject(Error('เลือก PNG, JPG หรือ WebP ขนาดไม่เกิน 10 MB'));const reader=new FileReader();reader.onerror=()=>reject(Error('อ่านไฟล์ไม่สำเร็จ'));reader.onload=async()=>{const image=new Image();image.src=reader.result;try{await image.decode();images.set(reader.result,image);resolve({src:reader.result,image})}catch{reject(Error('เปิดภาพไม่สำเร็จ'))}};reader.readAsDataURL(file)})}
-for(const id of ['imageFile','bgFile'])$(id).onchange=async event=>{if(!event.target.files[0])return;try{const {src,image}=await readImage(event.target.files[0]);if(id==='bgFile'){remember();state.bgImage=src;refresh()}else{const w=state.w*.3;add({type:'image',src,x:state.w*.1,y:state.h*.1,w,h:w*image.height/image.width})}}catch(e){notice(e.message)}event.target.value=''};
-$('clearBg').onclick=()=>{remember();state.bgImage='';refresh()};
-$('resize').onclick=()=>{const w=Number($('w').value),h=Number($('h').value);if(!Number.isInteger(w)||!Number.isInteger(h)||w<240||w>4000||h<180||h>4000)return notice('กำหนดความกว้าง 240–4000 และความสูง 180–4000 px');remember();const sx=w/state.w,sy=h/state.h;state.items.forEach(i=>{i.x*=sx;i.y*=sy;i.w*=sx;i.h*=sy;if(i.size)i.size*=Math.min(sx,sy)});state.w=w;state.h=h;refresh();notice('ปรับขนาดชิ้นงานและองค์ประกอบแล้ว')};
-for(const [id,key]of Object.entries({content:'text',url:'url',x:'x',y:'y',ew:'w',eh:'h',fontSize:'size',color:'color',fill:'fill',align:'align',weight:'weight'}))$(id).oninput=()=>{const i=current();if(!i)return;let value=$(id).value;if(['x','y','w','h','size'].includes(key)){value=Number(value);if(!Number.isFinite(value)||(['w','h','size'].includes(key)&&value<=0))return}remember();i[key]=value;draw()};
-function mutate(fn){if(!current())return;remember();fn(current());refresh()}
-$('center').onclick=()=>mutate(i=>i.x=(state.w-i.w)/2);$('delete').onclick=()=>mutate(i=>{state.items=state.items.filter(item=>item!==i);selected=null});$('duplicate').onclick=()=>{if(current())add({...current(),x:current().x+20,y:current().y+20})};for(const [id,delta]of [['forward',1],['backward',-1]])$(id).onclick=()=>mutate(i=>{const p=state.items.indexOf(i),next=Math.max(0,Math.min(state.items.length-1,p+delta));state.items.splice(p,1);state.items.splice(next,0,i)});
-function point(e){const r=canvas.getBoundingClientRect();return{x:(e.clientX-r.left)*state.w/r.width,y:(e.clientY-r.top)*state.h/r.height}}canvas.onpointerdown=e=>{const p=point(e),i=[...state.items].reverse().find(item=>itemContainsPoint(item,p));selected=i?.id??null;refresh();if(i){drag={id:i.id,dx:p.x-i.x,dy:p.y-i.y,before:snapshot(),moved:false};canvas.setPointerCapture(e.pointerId)}};canvas.onpointermove=e=>{if(!drag)return;const i=current(),p=point(e);if(!i)return;i.x=Math.round(Math.max(0,Math.min(state.w-i.w,p.x-drag.dx)));i.y=Math.round(Math.max(0,Math.min(state.h-i.h,p.y-drag.dy)));drag.moved=true;draw();$('x').value=i.x;$('y').value=i.y};function stopDrag(){if(drag?.moved){history.push(drag.before);future=[]}drag=null;draw()}canvas.onpointerup=stopDrag;canvas.onpointercancel=stopDrag;canvas.onkeydown=e=>{const delta={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[e.key];if(delta&&current()){e.preventDefault();mutate(i=>{i.x+=delta[0]*(e.shiftKey?10:1);i.y+=delta[1]*(e.shiftKey?10:1)})}};
-function restore(value){state=JSON.parse(value);selected=null;$('w').value=state.w;$('h').value=state.h;refresh()}
-$('undo').onclick=()=>{if(history.length){future.push(snapshot());restore(history.pop())}};$('redo').onclick=()=>{if(future.length){history.push(snapshot());restore(future.pop())}};
-function download(blob,name){const a=document.createElement('a'),url=URL.createObjectURL(blob);a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1500)}
-function cleanCanvas(){const c=document.createElement('canvas');c.width=state.w;c.height=state.h;paint(c.getContext('2d'));return c}
-document.querySelectorAll('[data-format]').forEach(button=>button.onclick=()=>cleanCanvas().toBlob(blob=>{if(!blob)return notice('ส่งออกภาพไม่สำเร็จ');const ext=blob.type==='image/jpeg'?'jpg':blob.type==='image/webp'?'webp':'png';download(blob,`intro-dialog-${state.w}x${state.h}.${ext}`);notice('ส่งออกภาพแล้ว')},button.dataset.format,.94));
-function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}function safeUrl(value){try{const u=new URL(value);return ['https:','http:'].includes(u.protocol)?u.href:''}catch{return ''}}
-function htmlCode(){const image=cleanCanvas().toDataURL('image/png');const links=state.items.filter(i=>i.type==='button'&&safeUrl(i.url)).map(i=>`<a href="${escapeHtml(safeUrl(i.url))}" target="_blank" rel="noopener" aria-label="${escapeHtml(i.text)}" style="position:absolute;left:${i.x/state.w*100}%;top:${i.y/state.h*100}%;width:${i.w/state.w*100}%;height:${i.h/state.h*100}%"></a>`).join('\n');return `<!doctype html>\n<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Intro Dialog</title></head><body style="margin:0"><div style="position:relative;max-width:${state.w}px"><img src="${image}" alt="${escapeHtml(state.items.filter(i=>i.type==='text').map(i=>i.text).join(' '))}" width="${state.w}" height="${state.h}" style="display:block;width:100%;height:auto">${links}</div></body></html>`}
-$('exportHtml').onclick=()=>{download(new Blob([htmlCode()],{type:'text/html;charset=utf-8'}),'intro-dialog.html');notice('ส่งออก HTML พร้อมภาพและพื้นที่ลิงก์ปุ่มแล้ว')};$('showCode').onclick=()=>{$('codeOutput').value=htmlCode();$('codeOutput').classList.toggle('hidden');notice('คัดลอกโค้ดจากช่องด้านล่างได้ ลิงก์ต้องขึ้นต้นด้วย http:// หรือ https://')};$('saveProject').onclick=()=>download(new Blob([snapshot()],{type:'application/json'}),'intro-dialog-project.json');$('loadProject').onclick=()=>$('projectFile').click();$('projectFile').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{const text=await file.text(),data=JSON.parse(text);if(!Number.isInteger(data.w)||data.w<240||data.w>4000||!Number.isInteger(data.h)||data.h<180||data.h>4000||!Array.isArray(data.items)||data.items.some(i=>!['text','button','image'].includes(i.type)||!['x','y','w','h'].every(k=>Number.isFinite(i[k]))))throw Error();remember();restore(text);showStudioWorkspace();notice('เปิดโปรเจกต์แล้ว')}catch{notice('เปิดไฟล์ไม่สำเร็จ กรุณาใช้ไฟล์โปรเจกต์ที่บันทึกจากโปรแกรมนี้')}e.target.value=''};
-const palettes={plain:['#173e37','#6b8b70','#dcebc4'],corporate:['#162d48','#365b79','#b6d2e8'],luxury:['#241e1b','#655036','#e9ca88'],nature:['#18483b','#789564','#d7e4aa'],tech:['#142445','#235b70','#80deed'],celebration:['#722851','#bd6978','#ffe0a6']};
-$('bgStyle').onchange = () => {
-  remember();
-  state.bgStyle = $('bgStyle').value;
-  const [first, last, accent] = palettes[state.bgStyle];
-  state.bgA = first;
-  state.bgB = last;
-  state.bgAccent = accent;
-  delete state.bgStops;
-  delete state.bgSolidIndex;
-  state.bgSeed = Math.floor(Math.random() * 1000000);
-  refresh();
-  notice('ใช้สไตล์และชุดสีสำเร็จรูปแล้ว');
-};
-for(const id of ['bgAccent','bgIntensity','bgAngle','bgShade']){let before=null;$(id).addEventListener('input',()=>{if(before===null)before=snapshot();state[id]=id==='bgAccent'?$(id).value:Number($(id).value);draw();$('bgIntensityValue').textContent=(state.bgIntensity??25)+'%';$('bgAngleValue').textContent=(state.bgAngle??135)+'°';$('bgShadeValue').textContent=(state.bgShade??0)+'%'});$(id).addEventListener('change',()=>{if(before!==null){history.push(before);future=[];before=null}refresh()})}
-$('randomBg').onclick=()=>{remember();if((state.bgPattern??state.bgStyle??'plain')==='plain')state.bgPattern='corporate';state.bgSeed=Math.floor(Math.random()*1000000);if((state.bgPattern??state.bgStyle)==='luxury')state.bgAngle=Math.floor(Math.random()*360);refresh();notice('สุ่มลวดลายใหม่แล้ว ย้อนกลับได้ด้วยปุ่ม ↶')};
-const bgControls=document.createElement('div');bgControls.innerHTML='<label for="bgLayer">ลำดับภาพ BG และสีพื้น</label><select id="bgLayer"><option value="front">ภาพอยู่ด้านหน้าสี BG</option><option value="behind">ภาพอยู่ด้านหลังสี BG</option></select><label for="bgColorOpacity">ความเข้มสีที่ทับภาพ <span id="bgColorOpacityValue">40%</span></label><input id="bgColorOpacity" type="range" min="0" max="100" value="40"><p>เมื่อภาพอยู่ด้านหลังสี ลดความเข้มสีเพื่อให้เห็นภาพ ลวดลายและข้อความอยู่ด้านหน้าทั้งสองชั้น</p>';
-$('bgFile').closest('label').after(bgControls);
-$('bgLayer').onchange = () => {
-  remember();
-  state.bgLayer = $('bgLayer').value;
-  refresh();
-};
-let beforeOpacity=null;$('bgColorOpacity').oninput=()=>{if(beforeOpacity===null)beforeOpacity=snapshot();state.bgColorOpacity=Number($('bgColorOpacity').value);$('bgColorOpacityValue').textContent=state.bgColorOpacity+'%';draw()};$('bgColorOpacity').onchange=()=>{if(beforeOpacity!==null){history.push(beforeOpacity);future=[];beforeOpacity=null}refresh()};
-refresh();
-</script>
-<style>
-#bgPalettePreview {
-  height: 22px; border: 1px solid var(--line); border-radius: 6px; margin-top: 10px;
-}
-.bg-color-row {
-  display: grid; grid-template-columns: minmax(0, 1fr) minmax(62px, 76px) 34px;
-  gap: 6px; align-items: center; margin-top: 6px;
-}
-.bg-color-row input[type="number"], .bg-color-row button { min-height: 37px; padding: 4px; font-size: 12px; }
-.bg-color-row button[aria-pressed="true"] { color: var(--accent); background: var(--accent-soft); border-color: var(--accent); }
-#patternGallery { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin: 10px 0 12px; }
-#patternGallery button { min-width: 0; padding: 4px; font-size: 11px; font-weight: 500; }
-#patternGallery button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
-#patternGallery canvas { width: 100%; height: auto; border-radius: 4px; pointer-events: none; }
-#patternGallery span { display: block; padding: 4px 1px 2px; overflow-wrap: anywhere; }
-#art {
-  background-color: white;
-  background-image: conic-gradient(#e2e3ec 25%, transparent 0 50%, #e2e3ec 0 75%, transparent 0);
-  background-size: 16px 16px;
-}
-#buttonStyleTools { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 12px; }
-#buttonStyleTools h2 { margin: 0 0 6px; }
-#imageCropPanel { padding-bottom: 14px; margin-bottom: 12px; border-bottom: 1px solid var(--line); }
-#imageShapeGallery { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-#imageShapeGallery button { min-width: 0; padding: 4px 2px; font-size: 11px; overflow-wrap: anywhere; }
-#imageShapeGallery button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
-#imageShapeGallery canvas { width: 52px; max-width: 100%; height: auto; margin: 0 auto 3px; }
-#imageCropPanel details { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 7px; }
-#imageCropPanel summary { font-size: 12px; font-weight: 600; }
-#frameEditor { width: 100%; height: auto; border: 1px solid var(--line); border-radius: 7px; background: var(--field); touch-action: none; }
-.frame-actions { margin-top: 8px; }
-.frame-actions button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
-#aiShapePreview { width: 100%; max-height: 115px; margin: 8px 0; background: var(--field); border: 1px solid var(--line); border-radius: 7px; }
-#aiShapePrompt { min-height: 72px; }
-#aiShapeProgress { width: 100%; accent-color: var(--accent); }
-.ai-shape-toggle { display: flex; align-items: center; gap: 7px; cursor: pointer; }
-#aiShapeAuto { width: auto; margin: 0; accent-color: var(--accent); }
-</style>
-<script>
-function syncOpacity() {
-  $('bgFillMode').value = state.bgFillMode || 'gradient';
-  $('bgOpacity').value = state.bgOpacity ?? 100;
-  $('bgOpacityValue').textContent = (state.bgOpacity ?? 100) + '%';
-  $('bgAngleControls').hidden = state.bgFillMode === 'solid';
-}
-
-function updateBackgroundStops(stops, solidIndex) {
-  remember();
-  state.bgStops = stops;
-  state.bgSolidIndex = solidIndex;
-  refresh();
-}
-
-function buildColorRow(index) {
-  const row = document.createElement('div');
-  row.className = 'bg-color-row';
-  const color = document.createElement('input');
-  color.type = 'color';
-  color.setAttribute('aria-label', 'สีที่ ' + (index + 1));
-  const position = document.createElement('input');
-  position.type = 'number';
-  position.min = 0;
-  position.max = 100;
-  position.step = 1;
-  position.setAttribute('aria-label', 'ตำแหน่งสีที่ ' + (index + 1) + ' (%)');
-  const choose = document.createElement('button');
-  choose.type = 'button';
-  choose.setAttribute('aria-label', 'ใช้สีที่ ' + (index + 1));
-  const remove = document.createElement('button');
-  remove.type = 'button';
-  remove.textContent = '×';
-  remove.setAttribute('aria-label', 'ลบสีที่ ' + (index + 1));
-
-  function updateStop(patch) {
-    const stops = backgroundStops(state);
-    const next = stops.map((stop, i) => i === index ? { ...stop, ...patch } : stop);
-    updateBackgroundStops(next, solidColorIndex(state, stops));
-  }
-
-  color.addEventListener('change', () => updateStop({ color: color.value }));
-  position.addEventListener('change', () => {
-    const value = position.valueAsNumber;
-    if (Number.isFinite(value)) updateStop({ position: Math.max(0, Math.min(100, Math.round(value))) });
-    else syncColorPalette();
-  });
-  choose.addEventListener('click', () => {
-    const stops = backgroundStops(state);
-    if (index !== solidColorIndex(state, stops)) updateBackgroundStops(stops, index);
-  });
-  remove.addEventListener('click', () => {
-    const stops = backgroundStops(state);
-    if (stops.length <= 2) return;
-    const active = solidColorIndex(state, stops);
-    const next = stops.filter((_, i) => i !== index);
-    const nextActive = active > index ? active - 1 : Math.min(active, next.length - 1);
-    updateBackgroundStops(next, nextActive);
-    $('bgPalette').children[Math.min(index, next.length - 1)].firstElementChild.focus();
-  });
-  row.append(color, position, choose, remove);
-  return row;
-}
-
-function syncColorPalette() {
-  const palette = $('bgPalette');
-  const stops = backgroundStops(state);
-  const isSolid = state.bgFillMode === 'solid';
-  const active = solidColorIndex(state, stops);
-  if (palette.children.length !== stops.length) {
-    palette.replaceChildren(...stops.map((_, index) => buildColorRow(index)));
-  }
-  stops.forEach((stop, index) => {
-    const [color, position, choose, remove] = palette.children[index].children;
-    color.value = stop.color;
-    position.value = stop.position;
-    position.hidden = isSolid;
-    choose.hidden = !isSolid;
-    choose.textContent = index === active ? 'กำลังใช้' : 'ใช้สีนี้';
-    choose.setAttribute('aria-pressed', String(index === active));
-    remove.disabled = stops.length <= 2;
-  });
-  $('addBgColor').disabled = stops.length >= MAX_BACKGROUND_COLORS;
-  const preview = $('bgPalettePreview');
-  if (isSolid) {
-    preview.style.background = stops[active].color;
-    $('bgPaletteHint').textContent = 'เลือกสีที่ใช้ หรือเก็บสีอื่นไว้ในจานสี';
-  } else {
-    const cssStops = backgroundFillStops(stops, state.bgFillMode)
-      .map(stop => stop.color + ' ' + stop.position + '%').join(', ');
-    preview.style.background = 'linear-gradient(90deg, ' + cssStops + ')';
-    $('bgPaletteHint').textContent = 'ตำแหน่งสี 0–100% ตามทิศทางที่เลือก';
-  }
-}
-
-$('addBgColor').addEventListener('click', () => {
-  const stops = backgroundStops(state);
-  if (stops.length >= MAX_BACKGROUND_COLORS) return;
-  const positions = [0, ...stops.map(stop => stop.position).sort((a, b) => a - b), 100];
-  let slot = 1;
-  for (let index = 2; index < positions.length; index++) {
-    if (positions[index] - positions[index - 1] > positions[slot] - positions[slot - 1]) slot = index;
-  }
-  const position = Math.round((positions[slot - 1] + positions[slot]) / 2);
-  const suggestions = ['#e9b56a', '#ab8af5', '#5fbee0', '#e78494', '#e7eacd', '#294f7b', '#b3cf8a', '#ed956d'];
-  const used = new Set(stops.map(stop => stop.color.toLowerCase()));
-  const color = suggestions.find(candidate => !used.has(candidate));
-  const active = state.bgFillMode === 'solid' ? stops.length : solidColorIndex(state, stops);
-  updateBackgroundStops([...stops, { color, position }], active);
-  $('bgPalette').lastElementChild.firstElementChild.focus();
-});
-$('bgFillMode').onchange=()=>{remember();state.bgFillMode=$('bgFillMode').value;refresh()};
-let opacityStart=null;$('bgOpacity').oninput=()=>{if(opacityStart===null)opacityStart=snapshot();state.bgOpacity=Number($('bgOpacity').value);syncOpacity();draw()};$('bgOpacity').onchange=()=>{if(opacityStart!==null){history.push(opacityStart);future=[];opacityStart=null}refresh()};
-const buttonTools=document.createElement('div');buttonTools.id='buttonStyleTools';buttonTools.innerHTML='<h2>สไตล์ปุ่ม</h2><label for="buttonStyle">รูปแบบ</label><select id="buttonStyle"><option value="solid">สีพื้น</option><option value="gradient">ไล่สี</option><option value="outline">เฉพาะเส้นขอบ</option><option value="text">ข้อความล้วน</option></select><div class="grid"><div><label for="buttonRadius">มุมโค้ง · px</label><input id="buttonRadius" type="number" min="0" max="2000"></div><div><label for="buttonBorder">ขอบ · px</label><input id="buttonBorder" type="number" min="0" max="50"></div></div><div class="grid"><div><label for="buttonEnd">สีปลายไล่สี</label><input id="buttonEnd" type="color"></div><div><label for="buttonBorderColor">สีเส้นขอบ</label><input id="buttonBorderColor" type="color"></div></div><label for="buttonOpacity">ความทึบสีปุ่ม · %</label><input id="buttonOpacity" type="number" min="0" max="100"><label for="buttonShadow">เงาปุ่ม</label><select id="buttonShadow"><option value="off">ไม่มีเงา</option><option value="on">มีเงา</option></select>';
-$('properties').append(buttonTools);
-function syncButton(){const i=current();buttonTools.classList.toggle('hidden',i?.type!=='button');if(i?.type==='button'){for(const [id,key,fallback]of [['buttonStyle','buttonStyle','solid'],['buttonRadius','radius',0],['buttonBorder','borderWidth',0],['buttonEnd','fillEnd','#528b76'],['buttonBorderColor','borderColor',i.color],['buttonOpacity','fillOpacity',100]])$(id).value=i[key]??fallback;$('buttonShadow').value=i.shadow?'on':'off'}}
-for(const [id,key]of [['buttonStyle','buttonStyle'],['buttonRadius','radius'],['buttonBorder','borderWidth'],['buttonEnd','fillEnd'],['buttonBorderColor','borderColor'],['buttonOpacity','fillOpacity'],['buttonShadow','shadow']])$(id).oninput=()=>{const i=current();if(i?.type!=='button')return;let value=$(id).value;if(['radius','borderWidth','fillOpacity'].includes(key)){value=Number(value);if(!Number.isFinite(value))return;value=Math.max(0,Math.min(key==='fillOpacity'?100:key==='borderWidth'?50:2000,value))}if(key==='shadow')value=value==='on';remember();i[key]=value;draw()};
-const backgroundPatterns = {
-  'พื้นฐาน': [
-    ['plain', 'ไม่มีลวดลาย'], ['diagonal', 'เส้นทแยง'], ['grid', 'เส้นตาราง'],
-    ['dots', 'จุดเรียง'], ['pinstripe', 'เส้นริ้วแนวตั้ง'], ['checker', 'ตารางหมากรุก']
-  ],
-  'เรขาคณิต': [
-    ['corporate', 'กรอบเรขาคณิต'], ['hex', 'รังผึ้ง'], ['chevron', 'บั้ง'],
-    ['crosses', 'เครื่องหมายบวก'], ['diamonds', 'ข้าวหลามตัด'], ['arches', 'ซุ้มโค้ง'],
-    ['frame', 'กรอบเส้นซ้อน'], ['tech', 'วงจรเทคโนโลยี']
-  ],
-  'เส้นและคลื่น': [
-    ['waves', 'เส้นคลื่น'], ['luxury', 'เส้นโค้งเรียบหรู'], ['rays', 'เส้นรัศมี'],
-    ['contours', 'เส้นชั้นความสูง'], ['ribbons', 'ริบบิ้น']
-  ],
-  'พื้นผิวและตกแต่ง': [
-    ['nature', 'รูปทรงออร์แกนิก'], ['celebration', 'กระดาษโปรย'],
-    ['sparkles', 'ประกายดาว'], ['bubbles', 'ฟองอากาศ'], ['grain', 'ผิวเม็ดละเอียด']
-  ]
-};
-
-const gallery = $('patternGallery');
-const patternFilter = $('patternCategory');
-let galleryStyle = '';
-for (const [category, patterns] of Object.entries(backgroundPatterns)) {
-  patternFilter.add(new Option(category, category));
-  for (const [key, name] of patterns) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.dataset.pattern = key;
-    button.dataset.category = category;
-    const thumbnail = document.createElement('canvas');
-    thumbnail.width = 240;
-    thumbnail.height = 150;
-    thumbnail.setAttribute('aria-hidden', 'true');
-    const label = document.createElement('span');
-    label.textContent = name;
-    button.append(thumbnail, label);
-    button.onclick = () => {
-      if (key === (state.bgPattern ?? state.bgStyle ?? 'plain')) return;
-      remember();
-      state.bgPattern = key;
-      refresh();
-    };
-    gallery.append(button);
-  }
-}
-patternFilter.addEventListener('change', () => {
-  for (const button of gallery.children) {
-    button.hidden = Boolean(patternFilter.value) && button.dataset.category !== patternFilter.value;
-  }
-});
-
-function renderPatterns() {
-  const thumbnailDesign = {
-    w: 240, h: 150, bgStops: backgroundStops(state), bgSolidIndex: state.bgSolidIndex,
-    bgFillMode: state.bgFillMode, bgAngle: state.bgAngle, bgAccent: state.bgAccent,
-    bgSeed: state.bgSeed, bgIntensity: Math.max(42, state.bgIntensity ?? 25)
-  };
-  const signature = JSON.stringify(thumbnailDesign);
-  const active = state.bgPattern ?? state.bgStyle ?? 'plain';
-  for (const button of gallery.children) {
-    button.setAttribute('aria-pressed', String(button.dataset.pattern === active));
-    if (signature !== galleryStyle) {
-      paintBackground(button.firstElementChild.getContext('2d'), {
-        ...thumbnailDesign, bgPattern: button.dataset.pattern
-      });
-    }
-  }
-  galleryStyle = signature;
-}
-
-const baseRefresh = refresh;
-refresh = function () {
-  baseRefresh();
-  syncOpacity();
-  syncColorPalette();
-  syncButton();
-  renderPatterns();
-};
-const baseCleanCanvas=cleanCanvas;cleanCanvas=function(white=false){const c=baseCleanCanvas();if(white){const context=c.getContext('2d');context.save();context.globalCompositeOperation='destination-over';context.fillStyle='#fff';context.fillRect(0,0,c.width,c.height);context.restore()}return c};
-document.querySelectorAll('[data-format]').forEach(button=>button.onclick=()=>cleanCanvas(button.dataset.format==='image/jpeg').toBlob(blob=>{if(!blob)return notice('ส่งออกภาพไม่สำเร็จ');const ext=blob.type==='image/jpeg'?'jpg':blob.type==='image/webp'?'webp':'png';download(blob,`intro-dialog-${state.w}x${state.h}.${ext}`);notice(ext==='jpg'?'ส่งออก JPG แล้ว พื้นที่โปร่งใสใช้สีขาว':'ส่งออกภาพแล้ว พร้อมความโปร่งใสที่กำหนด')},button.dataset.format,.94));
-// Keep UI navigation separate from the saved project and its undo history.
-const toolButtons = [...document.querySelectorAll('.tool-nav button')];
-for (const button of toolButtons) {
-  button.addEventListener('click', () => {
-    for (const tool of toolButtons) {
-      const active = tool === button;
-      tool.setAttribute('aria-pressed', String(active));
-      $(tool.getAttribute('aria-controls')).hidden = !active;
-    }
-    document.querySelector('.left').scrollTop = 0;
-  });
-}
-
-const exportDialog = $('exportDialog');
-$('openExport').addEventListener('click', () => {
-  $('exportStatus').textContent = '';
-  $('codeOutput').classList.add('hidden');
-  exportDialog.showModal();
-});
-
-const sizeControl = document.querySelector('.size-control');
-$('resize').addEventListener('click', () => {
-  if ($('w').checkValidity() && $('h').checkValidity() &&
-      Number($('w').value) === state.w && Number($('h').value) === state.h) {
-    sizeControl.open = false;
-    sizeControl.querySelector('summary').focus();
-  }
-});
-sizeControl.addEventListener('keydown', event => {
-  if (event.key === 'Escape' && sizeControl.open) {
-    sizeControl.open = false;
-    sizeControl.querySelector('summary').focus();
-  }
-});
-
-
-const imageCropPanel = document.createElement('section');
-imageCropPanel.id = 'imageCropPanel';
-imageCropPanel.className = 'hidden';
-imageCropPanel.innerHTML = `
-  <h2>ครอปรูปตามทรง</h2>
-  <div id="imageShapeGallery" role="group" aria-label="รูปทรงกรอบภาพ"></div>
-  <details class="ai-shape-tools">
-    <summary>สร้างกรอบด้วย AI</summary>
-    <label for="aiShapePrompt">อธิบายทรงที่ต้องการ</label>
-    <textarea id="aiShapePrompt" maxlength="300" placeholder="เช่น กรอบทรงหยดน้ำ ปลายเอียงขวา"></textarea>
-    <label class="ai-shape-toggle"><input id="aiShapeAuto" type="checkbox" checked> สร้างและใช้กรอบอัตโนมัติ</label>
-    <p>หยุดพิมพ์สักครู่เพื่อสร้างกรอบ หรือเว้นว่างแล้วกดให้ AI คิดทรงให้ ครั้งแรกต้องดาวน์โหลดโมเดลและใช้ WebGPU</p>
-    <button type="button" id="generateAiShape" class="primary block-action">สร้างตอนนี้</button>
-    <progress id="aiShapeProgress" max="1" aria-label="ความคืบหน้า" hidden></progress>
-    <p id="aiShapeStatus" role="status" aria-live="polite"></p>
-    <div id="aiShapeDraft" hidden>
-      <canvas id="aiShapePreview" width="240" height="90" aria-label="ตัวอย่างกรอบที่ AI สร้าง"></canvas>
-      <button type="button" id="applyAiShape" class="block-action">ใช้กรอบนี้</button>
-    </div>
-  </details>
-  <div id="customFrameTools" hidden>
-    <p>ลากจุดบนกรอบ หรือเลือกจุดแล้วกรอกตำแหน่ง X/Y</p>
-    <canvas id="frameEditor" width="240" height="148" aria-label="ตัวแก้จุดของรูปทรง"></canvas>
-    <label for="frameVertex">จุดที่กำลังแก้</label>
-    <select id="frameVertex"></select>
-    <div class="grid">
-      <div><label for="frameVertexX">X (%)</label><input id="frameVertexX" type="number" min="0" max="100" step="0.1"></div>
-      <div><label for="frameVertexY">Y (%)</label><input id="frameVertexY" type="number" min="0" max="100" step="0.1"></div>
-    </div>
-    <div class="group frame-actions"><button type="button" id="addFrameVertex">เพิ่มจุด</button><button type="button" id="removeFrameVertex">ลบจุด</button></div>
-    <button type="button" id="resetFrameVertices" class="block-action">คืนรูปทรงเริ่มต้น</button>
-  </div>
-  <details>
-    <summary>เส้นขอบและมุม</summary>
-    <div id="frameRadiusControls" hidden>
-      <label for="frameRadius">ความมนของมุม <span id="frameRadiusValue"></span></label>
-      <input id="frameRadius" type="range" min="0" max="100" value="36">
-    </div>
-    <label for="frameBorder">ความหนาเส้นขอบ <span id="frameBorderValue"></span></label>
-    <input id="frameBorder" type="range" min="0" max="100" value="0">
-    <label for="frameBorderColor">สีเส้นขอบ</label>
-    <input id="frameBorderColor" type="color" value="#ffffff">
-  </details>
-  <details open>
-    <summary>จัดรูปในกรอบ</summary>
-    <label for="imageCropZoom">ซูมภาพ <span id="imageCropZoomValue"></span></label>
-    <input id="imageCropZoom" type="range" min="100" max="300" value="100">
-    <label for="imageCropX">ส่วนภาพแนวนอน <span id="imageCropXValue"></span></label>
-    <input id="imageCropX" type="range" min="0" max="100" value="50">
-    <label for="imageCropY">ส่วนภาพแนวตั้ง <span id="imageCropYValue"></span></label>
-    <input id="imageCropY" type="range" min="0" max="100" value="50">
-    <label for="imageCropRotation">หมุนรูป <span id="imageCropRotationValue"></span></label>
-    <input id="imageCropRotation" type="range" min="-180" max="180" value="0">
-    <div class="group frame-actions">
-      <button type="button" id="imageFlipX" aria-pressed="false">กลับซ้าย–ขวา</button>
-      <button type="button" id="imageFlipY" aria-pressed="false">กลับบน–ล่าง</button>
-    </div>
-    <button id="resetImageCrop" class="block-action" type="button">คืนการจัดรูปในกรอบ</button>
-  </details>
-`;
-$('properties').prepend(imageCropPanel);
-
-const imageShapeGallery = $('imageShapeGallery');
-for (const [shape, name] of Object.entries(imageShapes)) {
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.dataset.shape = shape;
-  const thumbnail = document.createElement('canvas');
-  thumbnail.width = 60;
-  thumbnail.height = 36;
-  thumbnail.setAttribute('aria-hidden', 'true');
-  const preview = thumbnail.getContext('2d');
-  const bounds = imageShapeBounds({ x: 7, y: 4, w: 46, h: 28 }, shape);
-  preview.fillStyle = '#d9d2ff';
-  preview.strokeStyle = '#5343bb';
-  const path = imageClipPath(shape, bounds);
-  preview.fill(path);
-  preview.stroke(path);
-  const label = document.createElement('span');
-  label.textContent = name;
-  button.append(thumbnail, label);
-  button.addEventListener('click', () => {
-    const item = current();
-    if (item?.type === 'image' && imageShape(item) !== shape) {
-      mutate(target => { target.imageShape = shape; });
-    }
-  });
-  imageShapeGallery.append(button);
-}
-
-const imageCropControls = [
-  { id: 'imageCropZoom', key: 'cropZoom', fallback: 100, unit: '%' },
-  { id: 'imageCropX', key: 'cropX', fallback: 50, unit: '%' },
-  { id: 'imageCropY', key: 'cropY', fallback: 50, unit: '%' },
-  { id: 'imageCropRotation', key: 'cropRotation', fallback: 0, unit: '°' },
-  { id: 'frameRadius', key: 'frameRadius', fallback: 36, unit: '%' },
-  { id: 'frameBorder', key: 'frameBorder', fallback: 0, unit: ' px' }
-];
-
-function syncImageCropTools(item) {
-  imageCropPanel.classList.toggle('hidden', item?.type !== 'image');
-  if (item?.type !== 'image') return;
-  syncAiShapeDraft(item);
-  const shape = imageShape(item);
-  for (const button of imageShapeGallery.children) {
-    button.setAttribute('aria-pressed', String(button.dataset.shape === shape));
-  }
-  for (const { id, key, fallback, unit } of imageCropControls) {
-    const input = $(id);
-    input.value = imageCropValue(item, key, fallback, Number(input.min), Number(input.max));
-    $(id + 'Value').textContent = input.value + unit;
-  }
-  $('imageFlipX').setAttribute('aria-pressed', String(Boolean(item.cropFlipX)));
-  $('imageFlipY').setAttribute('aria-pressed', String(Boolean(item.cropFlipY)));
-  $('frameRadiusControls').hidden = shape !== 'rounded';
-  $('frameBorderColor').value = /^#[\da-f]{6}$/i.test(item.frameBorderColor) ? item.frameBorderColor : '#ffffff';
-  $('customFrameTools').hidden = shape !== 'polygon';
-  if (shape === 'polygon') syncFrameEditor(item);
-}
-
-for (const { id, key, unit } of imageCropControls) {
-  const input = $(id);
-  let gestureItem = null;
-  input.addEventListener('input', () => {
-    const item = current();
-    if (item?.type !== 'image') return;
-    if (item !== gestureItem) {
-      remember();
-      gestureItem = item;
-    }
-    item[key] = input.valueAsNumber;
-    $(id + 'Value').textContent = input.value + unit;
-    draw();
-  });
-  input.addEventListener('change', () => { gestureItem = null; });
-  input.addEventListener('blur', () => { gestureItem = null; });
-}
-
-for (const [id, key] of [['imageFlipX', 'cropFlipX'], ['imageFlipY', 'cropFlipY']]) {
-  $(id).onclick = () => mutate(item => { item[key] = !item[key]; });
-}
-
-$('frameBorderColor').onchange = () => mutate(item => { item.frameBorderColor = $('frameBorderColor').value; });
-
-$('resetImageCrop').onclick = () => mutate(item => {
-  for (const key of ['cropZoom', 'cropX', 'cropY', 'cropRotation', 'cropFlipX', 'cropFlipY']) delete item[key];
-});
-
-const frameEditor = $('frameEditor');
-const frameEditorContext = frameEditor.getContext('2d');
-const editorBounds = { x: 16, y: 16, w: 208, h: 116 };
-let activeFrameVertex = 0;
-let activeFrameItemId = null;
-let frameDrag = null;
-
-function syncFrameEditor(item) {
-  const points = framePoints(item);
-  if (activeFrameItemId !== item.id) {
-    activeFrameItemId = item.id;
-    activeFrameVertex = 0;
-  }
-  activeFrameVertex = Math.min(activeFrameVertex, points.length - 1);
-  const picker = $('frameVertex');
-  if (picker.options.length !== points.length) {
-    picker.replaceChildren(...points.map((_, index) => new Option('จุด ' + (index + 1), String(index))));
-  }
-  picker.value = activeFrameVertex;
-  const activePoint = points[activeFrameVertex];
-  $('frameVertexX').value = activePoint.x;
-  $('frameVertexY').value = activePoint.y;
-  $('addFrameVertex').disabled = points.length >= MAX_FRAME_POINTS;
-  $('removeFrameVertex').disabled = points.length <= 3;
-
-  const context = frameEditorContext;
-  const { x, y, w, h } = editorBounds;
-  context.clearRect(0, 0, frameEditor.width, frameEditor.height);
-  context.strokeStyle = '#c1bfd3';
-  context.strokeRect(x, y, w, h);
-  const path = imageClipPath('polygon', editorBounds, item);
-  context.fillStyle = '#dfd8ff';
-  context.fill(path);
-  context.strokeStyle = '#5443c7';
-  context.stroke(path);
-  points.forEach((point, index) => {
-    context.beginPath();
-    context.arc(x + w * point.x / 100, y + h * point.y / 100, index === activeFrameVertex ? 6 : 4.5, 0, Math.PI * 2);
-    context.fillStyle = index === activeFrameVertex ? '#5443c7' : '#ffffff';
-    context.fill();
-    context.stroke();
-  });
-}
-
-function customFrameItem() {
-  const item = current();
-  return item?.type === 'image' && imageShape(item) === 'polygon' ? item : null;
-}
-
-function vertexPercentage(value) {
-  return Math.round(Math.max(0, Math.min(100, value)) * 10) / 10;
-}
-
-function editorPointer(event) {
-  const bounds = frameEditor.getBoundingClientRect();
-  return {
-    x: (event.clientX - bounds.left) * frameEditor.width / bounds.width,
-    y: (event.clientY - bounds.top) * frameEditor.height / bounds.height
-  };
-}
-
-frameEditor.addEventListener('pointerdown', event => {
-  const item = customFrameItem();
-  if (!item || frameDrag || event.button !== 0) return;
-  const pointer = editorPointer(event);
-  const { x, y, w, h } = editorBounds;
-  let nearest = -1;
-  let distance = 14;
-  framePoints(item).forEach((point, index) => {
-    const gap = Math.hypot(pointer.x - x - w * point.x / 100, pointer.y - y - h * point.y / 100);
-    if (gap < distance) {
-      distance = gap;
-      nearest = index;
-    }
-  });
-  if (nearest < 0) return;
-  activeFrameVertex = nearest;
-  frameDrag = { id: event.pointerId, item, index: nearest, started: false };
-  frameEditor.setPointerCapture(event.pointerId);
-  syncFrameEditor(item);
-});
-
-frameEditor.addEventListener('pointermove', event => {
-  const item = customFrameItem();
-  if (!frameDrag || frameDrag.item !== item || frameDrag.id !== event.pointerId) return;
-  const pointer = editorPointer(event);
-  const { x, y, w, h } = editorBounds;
-  const position = { x: vertexPercentage((pointer.x - x) / w * 100), y: vertexPercentage((pointer.y - y) / h * 100) };
-  if (!frameDrag.started) {
-    remember();
-    frameDrag.started = true;
-  }
-  item.framePoints = framePoints(item).map((point, index) => index === frameDrag.index ? position : point);
-  syncFrameEditor(item);
-  draw();
-});
-
-for (const name of ['pointerup', 'pointercancel', 'lostpointercapture']) {
-  frameEditor.addEventListener(name, event => { if (frameDrag?.id === event.pointerId) frameDrag = null; });
-}
-
-$('frameVertex').onchange = () => {
-  const item = customFrameItem();
-  if (!item) return;
-  activeFrameVertex = Number($('frameVertex').value);
-  syncFrameEditor(item);
-};
-
-for (const [id, axis] of [['frameVertexX', 'x'], ['frameVertexY', 'y']]) {
-  $(id).onchange = () => {
-    const item = customFrameItem();
-    if (!item) return;
-    const value = $(id).valueAsNumber;
-    if (!Number.isFinite(value)) return syncFrameEditor(item);
-    mutate(target => {
-      target.framePoints = framePoints(target).map((point, index) =>
-        index === activeFrameVertex ? { ...point, [axis]: vertexPercentage(value) } : point);
-    });
-  };
-}
-
-$('addFrameVertex').onclick = () => {
-  const item = customFrameItem();
-  if (!item) return;
-  const points = framePoints(item);
-  if (points.length >= MAX_FRAME_POINTS) return;
-  const from = points[activeFrameVertex];
-  const to = points[(activeFrameVertex + 1) % points.length];
-  const newPoint = { x: vertexPercentage((from.x + to.x) / 2), y: vertexPercentage((from.y + to.y) / 2) };
-  activeFrameVertex += 1;
-  mutate(target => {
-    target.framePoints = [...points.slice(0, activeFrameVertex), newPoint, ...points.slice(activeFrameVertex)];
-  });
-};
-
-$('removeFrameVertex').onclick = () => {
-  const item = customFrameItem();
-  if (!item || framePoints(item).length <= 3) return;
-  mutate(target => {
-    target.framePoints = framePoints(target).filter((_, index) => index !== activeFrameVertex);
-    activeFrameVertex = Math.min(activeFrameVertex, target.framePoints.length - 1);
-  });
-};
-
-$('resetFrameVertices').onclick = () => {
-  if (!customFrameItem()) return;
-  activeFrameVertex = 0;
-  mutate(target => { delete target.framePoints; });
-};
-
-const refreshEditor = refresh;
-refresh = function () {
-  refreshEditor();
-  const selectedItem = current();
-  syncAiShapeSelection(selectedItem);
-  syncImageCropTools(selectedItem);
-  const kinds = { text: 'ข้อความ', image: 'รูปภาพ', button: 'ปุ่ม' };
-  $('selectionKind').textContent = selectedItem ? kinds[selectedItem.type] : '';
-  for (const id of ['content', 'fontSize', 'color', 'align', 'weight']) {
-    $(id).closest('div').classList.toggle('hidden', selectedItem?.type === 'image');
-  }
-};
-
-const AI_SHAPE_MODEL = 'Qwen2.5-0.5B-Instruct-q4f32_1-MLC';
-const aiShapeInstruction = [
-  'Generate an editable polygon outline that matches the user description (Thai or English).',
-  'Return only JSON with a points key: {"points":[[x,y],[x,y],...]}.',
-  'Use 3 to 16 distinct vertices, with x and y numbers from 0 to 100; y grows downward.',
-  'List vertices in order around the perimeter. Do not repeat the first vertex or cross edges.',
-  'Use the frame well and approximate smooth shapes with several points.',
-  'Example, upward-pointing triangle: {"points":[[50,5],[95,95],[5,95]]}.',
-  'Example, right-tilted droplet: {"points":[[82,4],[86,32],[90,58],[82,77],[66,91],[44,96],[24,90],[14,74],[16,55],[32,37],[56,20]]}.'
-].join(' ');
-
-let aiShapeEngine = null;
-let aiShapeDraft = null;
-
-function decodeAiFrame(raw) {
-  const { points } = JSON.parse(raw);
-  if (!Array.isArray(points) || points.length < 3 || points.length > MAX_FRAME_POINTS) {
-    throw new Error('Invalid vertex count');
-  }
-  const vertices = points.map(point => {
-    if (!Array.isArray(point) || point.length !== 2 ||
-        !point.every(value => Number.isFinite(value) && value >= 0 && value <= 100)) {
-      throw new Error('Invalid coordinates');
-    }
-    return { x: vertexPercentage(point[0]), y: vertexPercentage(point[1]) };
-  });
-  if (new Set(vertices.map(({ x, y }) => x + ',' + y)).size !== vertices.length) {
-    throw new Error('Repeated vertices');
-  }
-  const area = vertices.reduce((sum, point, index) => {
-    const next = vertices[(index + 1) % vertices.length];
-    return sum + point.x * next.y - next.x * point.y;
-  }, 0);
-  if (Math.abs(area) < 50) throw new Error('Shape area is too small');
-  return vertices;
-}
-
-function syncAiShapeDraft(item) {
-  const draft = aiShapeDraft?.item === item ? aiShapeDraft : null;
-  $('aiShapeDraft').hidden = !draft;
-  if (!draft) return;
-
-  const canvas = $('aiShapePreview');
-  const context = canvas.getContext('2d');
-  const scale = Math.min((canvas.width - 20) / item.w, (canvas.height - 16) / item.h);
-  const w = item.w * scale;
-  const h = item.h * scale;
-  const bounds = { x: (canvas.width - w) / 2, y: (canvas.height - h) / 2, w, h };
-  const path = imageClipPath('polygon', bounds, { framePoints: draft.points });
-  context.clearRect(0, 0, canvas.width, canvas.height);
-  context.fillStyle = '#d9d2ff';
-  context.strokeStyle = '#5443c7';
-  context.fill(path);
-  context.stroke(path);
-}
-
-const AUTO_SHAPE_DELAY = 1200;
-let aiShapeSelection = null;
-let aiShapeRequestId = 0;
-let aiShapeTimer = null;
-let aiShapePending = null;
-let aiShapeBusy = false;
-
-function cancelAiShapeRequest() {
-  clearTimeout(aiShapeTimer);
-  aiShapePending = null;
-  aiShapeDraft = null;
-  aiShapeRequestId++;
-}
-
-function syncAiShapeSelection(item) {
-  if (item === aiShapeSelection) return;
-  aiShapeSelection = item;
-  cancelAiShapeRequest();
-  $('aiShapeStatus').textContent = '';
-  $('aiShapeDraft').hidden = true;
-}
-
-function isCurrentAiShapeRequest(request) {
-  return request.id === aiShapeRequestId && request.item === current();
-}
-
-function applyGeneratedFrame(points) {
-  activeFrameVertex = 0;
-  mutate(target => {
-    target.imageShape = 'polygon';
-    target.framePoints = points;
-  });
-}
-
-function automaticShapePrompt(item) {
-  const ratio = item.w / item.h;
-  const layout = ratio > 1.2 ? 'landscape' : ratio < .83 ? 'portrait' : 'square';
-  return 'Invent a decorative editable clipping frame for a ' + layout +
-    ' photo. Use an interesting but gentle outline with a large central area.';
-}
-
-function scheduleAiShape(immediate = false, composing = false) {
-  const item = current();
-  const prompt = $('aiShapePrompt').value.trim();
-  const automatic = $('aiShapeAuto').checked;
-  const status = $('aiShapeStatus');
-  if (item?.type !== 'image') return;
-
-  cancelAiShapeRequest();
-  syncAiShapeDraft(item);
-  status.textContent = '';
-  if (!immediate && (!automatic || !prompt || composing)) return;
-  if (!navigator.gpu) {
-    status.textContent = 'เบราว์เซอร์นี้ใช้ WebGPU ไม่ได้ ลองเปิดใน Chrome หรือ Edge ที่รองรับ';
-    return;
-  }
-
-  const request = {
-    id: aiShapeRequestId,
-    item,
-    prompt: prompt || automaticShapePrompt(item),
-    automatic,
-    originalShape: item.imageShape,
-    originalPoints: item.framePoints
-  };
-  const enqueue = () => {
-    aiShapePending = request;
-    if (aiShapeBusy) status.textContent = 'รอสร้างกรอบสำหรับคำอธิบายล่าสุด…';
-    void runAiShapeQueue();
-  };
-  if (immediate) enqueue();
-  else {
-    status.textContent = 'จะสร้างกรอบเมื่อหยุดพิมพ์…';
-    aiShapeTimer = setTimeout(enqueue, AUTO_SHAPE_DELAY);
-  }
-}
-
-async function runAiShapeQueue() {
-  if (aiShapeBusy || !aiShapePending) return;
-  const request = aiShapePending;
-  aiShapePending = null;
-  if (!isCurrentAiShapeRequest(request)) return;
-
-  aiShapeBusy = true;
-  const status = $('aiShapeStatus');
-  const progress = $('aiShapeProgress');
-  try {
-    if (!aiShapeEngine) {
-      status.textContent = 'กำลังเตรียมดาวน์โหลดโมเดล…';
-      progress.value = 0;
-      progress.hidden = false;
-      const { CreateMLCEngine } = await import('https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.88/+esm');
-      aiShapeEngine = await CreateMLCEngine(AI_SHAPE_MODEL, {
-        initProgressCallback: report => {
-          progress.value = Math.max(0, Math.min(1, report.progress));
-          if (isCurrentAiShapeRequest(request)) {
-            status.textContent = 'กำลังเตรียมโมเดล ' + Math.round(progress.value * 100) + '%';
-          }
+  artwork = null;
+  byId('sample').hidden = Boolean(input);
+  byId('download').disabled = true;
+  byId('status').textContent = '';
+  if (![w,h].every(Number.isInteger) || w < 240 || w > 4000 || h < 180 || h > 4000) error = 'กำหนดความกว้าง 240–4000 px และความสูง 180–4000 px';
+  else if (text.length > 8000 || button.length > 250) error = 'รองรับข้อความสูงสุด 8,000 ตัวอักษร และข้อความปุ่ม 250 ตัวอักษร';
+  if (!error) {
+    if (canvas.width !== w) canvas.width = w;
+    if (canvas.height !== h) canvas.height = h;
+    const [title, body] = splitCopy(text);
+    const blocks = measureLayout(w, h, title, body, button);
+    if (!blocks) error = 'ข้อความยาวเกินพื้นที่ ลองเพิ่มขนาด Popup หรือย่อข้อความ';
+    else {
+      paintBackdrop(w, h, text);
+      ctx.textBaseline = 'middle';
+      for (const block of blocks) {
+        const isButton = block.kind === 'button';
+        if (isButton) {
+          ctx.fillStyle = '#fff';
+          ctx.beginPath();
+          ctx.roundRect(block.x, block.y, block.w, block.h, Math.min(block.h / 2, block.px * .45));
+          ctx.fill();
         }
-      });
-    }
-
-    progress.hidden = true;
-    if (!isCurrentAiShapeRequest(request)) return;
-    status.textContent = 'AI กำลังสร้างรูปทรง…';
-    const result = await aiShapeEngine.chat.completions.create({
-      messages: [
-        { role: 'system', content: aiShapeInstruction },
-        { role: 'user', content: request.prompt }
-      ],
-      response_format: { type: 'json_object' },
-      max_tokens: 260,
-      temperature: .2
-    });
-    if (!isCurrentAiShapeRequest(request)) return;
-
-    let points;
-    try {
-      points = decodeAiFrame(result.choices[0]?.message.content);
-    } catch {
-      status.textContent = 'AI สร้างกรอบไม่สำเร็จ ลองปรับคำอธิบายแล้วสร้างอีกครั้ง';
-      return;
-    }
-    const outlineUnchanged = request.item.imageShape === request.originalShape &&
-      request.item.framePoints === request.originalPoints;
-    if (request.automatic && outlineUnchanged) {
-      applyGeneratedFrame(points);
-      status.textContent = 'ใช้กรอบอัตโนมัติแล้ว แก้จุดต่อหรือกดย้อนกลับได้';
-    } else {
-      aiShapeDraft = { item: request.item, points };
-      syncAiShapeDraft(request.item);
-      status.textContent = 'สร้างกรอบแล้ว กด “ใช้กรอบนี้” เพื่อแทนกรอบปัจจุบัน';
-    }
-  } catch (error) {
-    console.warn('Dialog Studio AI', error);
-    aiShapeEngine = null;
-    if (isCurrentAiShapeRequest(request)) {
-      status.textContent = 'เปิดโมเดลหรือสร้างกรอบไม่สำเร็จ ลองใหม่บนเบราว์เซอร์ที่รองรับ WebGPU';
-    }
-  } finally {
-    aiShapeBusy = false;
-    progress.hidden = true;
-    void runAiShapeQueue();
-  }
-}
-
-$('aiShapePrompt').addEventListener('input', event => scheduleAiShape(false, event.isComposing));
-$('aiShapePrompt').addEventListener('compositionend', () => scheduleAiShape());
-$('aiShapeAuto').addEventListener('change', () => scheduleAiShape());
-$('generateAiShape').addEventListener('click', () => scheduleAiShape(true));
-
-$('applyAiShape').addEventListener('click', () => {
-  const item = current();
-  if (!aiShapeDraft || aiShapeDraft.item !== item) return;
-  const points = aiShapeDraft.points;
-  aiShapeDraft = null;
-  applyGeneratedFrame(points);
-  $('aiShapeStatus').textContent = 'ใช้กรอบแล้ว แก้รูปทรงต่อได้ในส่วนกำหนดเอง';
-});
-
-function readPopupCopy(brief, headline, detail) {
-  if (headline || detail) return { headline, detail };
-  const [lead = '', ...rest] = brief.split(/\n+/).map(line => line.trim()).filter(Boolean);
-  const visualDirections = /(?:^|\s)(?:พื้นหลัง|โทน(?:สี)?|สไตล์|จัดวาง|background|palette|style|layout)\s*:?\s*/i;
-  const buttonDirections = /(?:^|\s)(?:มีปุ่ม|ใส่ปุ่ม|เพิ่มปุ่ม|with a button)/iu;
-  const contentOnly = line => line.split(visualDirections)[0].split(buttonDirections)[0].trim();
-  return {
-    headline: contentOnly(lead).replace(/^(?:ช่วย)?(?:ทำ|สร้าง|ออกแบบ)\s*(?:popup|ป๊อปอัป|ป๊อปอัพ)\s*(?:สำหรับ|เรื่อง|:)?\s*/i, ''),
-    detail: rest.map(contentOnly).filter(Boolean).join('\n')
-  };
-}
-
-const popupPalettes = [
-  { match: /แดง|red|maroon/i, colors: ['#401326', '#8f273f', '#f4bc8f'], pattern: 'ribbons' },
-  { match: /ทอง|หรู|gold|luxury|premium/i, colors: ['#25201c', '#6f4c2d', '#eed295'], pattern: 'luxury' },
-  { match: /เขียว|ธรรมชาติ|eco|green|nature/i, colors: ['#0c3029', '#2b6950', '#c3e1a5'], pattern: 'contours' },
-  { match: /ฟ้า|น้ำเงิน|เทคโนโลยี|blue|tech/i, colors: ['#102043', '#265989', '#94d6ef'], pattern: 'tech' },
-  { match: /ม่วง|purple|violet/i, colors: ['#281347', '#593b90', '#d8baf4'], pattern: 'arches' },
-  { match: /ชมพู|pink|rose/i, colors: ['#461d3e', '#994664', '#f3b5c8'], pattern: 'waves' }
-];
-
-function samplePopupReference(image) {
-  const sample = document.createElement('canvas');
-  sample.width = 32;
-  sample.height = 24;
-  const context = sample.getContext('2d');
-  context.drawImage(image, 0, 0, sample.width, sample.height);
-  const { data } = context.getImageData(0, 0, sample.width, sample.height);
-  const bins = new Map();
-  const highlights = [0, 0, 0];
-  for (let pixel = 0; pixel < data.length; pixel += 4) {
-    const rgb = [data[pixel], data[pixel + 1], data[pixel + 2]];
-    const value = Math.max(...rgb);
-    const saturation = value - Math.min(...rgb);
-    if (data[pixel + 3] < 128) continue;
-    if (value > 215 && saturation < 28) highlights[Math.floor(((pixel / 4) % sample.width) * 3 / sample.width)]++;
-    if (value < 24 || value > 233 && saturation < 28) continue;
-    const key = rgb.map(value => Math.floor(value / 40)).join(',');
-    const bin = bins.get(key) || { rgb, weight: 0 };
-    bin.weight += 1 + saturation / 60;
-    bins.set(key, bin);
-  }
-  const rgb = [...bins.values()].sort((a, b) => b.weight - a.weight)[0]?.rgb;
-  if (!rgb) return null;
-  const hex = channels => '#' + channels.map(channel => Math.round(channel).toString(16).padStart(2, '0')).join('');
-  const raw = hex(rgb);
-  const leftWeighted = highlights[0] > highlights[1] * 1.65 && highlights[0] > highlights[2] * 1.65;
-  return { colors: [hex(rgb.map(value => value * .30 + 12)), hex(rgb.map(value => value * .62 + 18)), raw],
-    align: leftWeighted ? 'left' : 'center' };
-}
-
-function popupDesignDirection(brief, reference, variation) {
-  const match = popupPalettes.find(preset => preset.match.test(brief));
-  const defaults = [
-    { colors: ['#152339', '#365576', '#b2ddf1'], pattern: 'ribbons' },
-    { colors: ['#2a2342', '#53457a', '#d5c5f7'], pattern: 'contours' },
-    { colors: ['#132d31', '#386566', '#a8e1cc'], pattern: 'diagonal' }
-  ];
-  const fallback = defaults[variation % defaults.length];
-  const colors = match?.colors || reference?.colors || fallback.colors;
-  const align = /ชิดซ้าย|วางซ้าย|left.align/i.test(brief) ? 'left' :
-    /กึ่งกลาง|ตรงกลาง|center/i.test(brief) ? 'center' : reference?.align || 'center';
-  return { colors, align, pattern: match?.pattern || fallback.pattern };
-}
-
-function composePopup({ width, height, copy, button, background, reference, brief, logo, variation = 1 }) {
-  const direction = popupDesignDirection(brief, reference, variation);
-  const [dark, mid, accent] = direction.colors;
-  const design = {
-    w: width, h: height, bgA: dark, bgB: mid, bgAccent: accent,
-    bgPattern: background ? 'plain' : direction.pattern, bgSeed: variation,
-    bgIntensity: 21, bgAngle: 122 + variation % 23, bgImage: background || '',
-    bgLayer: 'behind', bgShade: background ? 28 : 0, bgColorOpacity: 45, items: []
-  };
-  const typeMeasure = document.createElement('canvas').getContext('2d');
-  const scale = Math.min(width, height * 1.5);
-  const margin = Math.min(width * .12, Math.max(15, width * .085));
-  const textWidth = width - margin * 2;
-  const units = [
-    copy.headline && { type: 'text', text: copy.headline, size: Math.min(140, scale * .066), weight: '700', color: '#ffffff' },
-    copy.detail && { type: 'text', text: copy.detail, size: Math.min(58, scale * .033), weight: '400', color: '#f4f4f7' },
-    button && { type: 'button', ...button, size: Math.min(45, scale * .025), weight: '700', color: '#25233a', fill: '#f7f1e7' }
-  ].filter(Boolean);
-  const maxHeight = height * .84;
-  for (let attempt = 0; attempt < 25; attempt++) {
-    const factor = .95 ** attempt;
-    const gap = Math.max(6, scale * .023 * factor);
-    const metrics = units.map(unit => {
-      const size = Math.max(11, Math.round(unit.size * factor));
-      typeMeasure.font = unit.weight + ' ' + size + 'px Arial,"Segoe UI",sans-serif';
-      const isButton = unit.type === 'button';
-      const lineWidth = isButton ? textWidth - 24 : textWidth;
-      const lines = linesFor(typeMeasure, unit.text, lineWidth);
-      const buttonWidth = Math.min(textWidth, Math.max(Math.min(130, textWidth), typeMeasure.measureText(unit.text).width + 34));
-      return { ...unit, size, w: isButton ? buttonWidth : textWidth,
-        h: Math.ceil(lines.length * size * 1.35 + (isButton ? Math.max(12, size * .8) : 3)) };
-    });
-    if (logo) {
-      const ratio = Math.min(width * .24 / logo.image.width, height * .115 / logo.image.height) * factor;
-      metrics.unshift({ type: 'image', src: logo.src, w: logo.image.width * ratio, h: logo.image.height * ratio });
-    }
-    const stackHeight = metrics.reduce((sum, unit) => sum + unit.h, 0) + (metrics.length - 1) * gap;
-    if (stackHeight > maxHeight) continue;
-    let y = Math.round((height - stackHeight) / 2);
-    for (const unit of metrics) {
-      const isButton = unit.type === 'button';
-      design.items.push({
-        ...unit, id: uid(), x: direction.align === 'left' ? margin : (width - unit.w) / 2, y,
-        align: isButton ? 'center' : direction.align,
-        ...(isButton ? { radius: Math.round(unit.h * .22) } : {})
-      });
-      y += unit.h + gap;
-    }
-    return design;
-  }
-  throw new Error('ข้อความยาวเกินขนาดนี้ กรุณาเพิ่มขนาดชิ้นงานหรือลดข้อความ');
-}
-
-const builderVariation = Math.floor(Math.random() * 1000000);
-const builderImageCache = new WeakMap();
-let builderPreviewRevision = 0;
-
-function setStudioView(editor) {
-  $('popupBuilder').hidden = editor;
-  $('studioWorkspace').hidden = !editor;
-  $('saveProject').hidden = !editor;
-  $('openExport').hidden = !editor;
-  const builderTab = $('openPopupBuilder');
-  const editorTab = $('openStudioWorkspace');
-  builderTab.removeAttribute('aria-current');
-  editorTab.removeAttribute('aria-current');
-  (editor ? editorTab : builderTab).setAttribute('aria-current', 'page');
-}
-
-function showStudioWorkspace(focusCanvas = false) {
-  setStudioView(true);
-  refresh();
-  if (focusCanvas) $('art').focus();
-}
-
-function builderCopy() {
-  const brief = $('popupBrief').value.trim();
-  const copy = readPopupCopy(brief, $('popupHeadline').value.trim(), $('popupBody').value.trim());
-  const rawUrl = $('popupButtonUrl').value.trim();
-  const url = safeUrl(rawUrl);
-  const label = $('popupButtonLabel').value.trim();
-  const buttonRequested = /มีปุ่ม|ใส่ปุ่ม|เพิ่มปุ่ม|with a button/i.test(brief);
-  const button = rawUrl || label || buttonRequested ? { text: label || 'ดูรายละเอียด', url } : null;
-  return { brief, copy, rawUrl, button };
-}
-
-function builderImage(inputId) {
-  const file = $(inputId).files[0];
-  if (!file) return Promise.resolve(null);
-  if (!builderImageCache.has(file)) builderImageCache.set(file, readImage(file));
-  return builderImageCache.get(file);
-}
-
-async function builderAssetOptions() {
-  const [reference, background, logo] = await Promise.all([
-    builderImage('popupReference'), builderImage('popupBackground'), builderImage('popupLogo')
-  ]);
-  return {
-    reference: reference ? samplePopupReference(reference.image) : null,
-    background: background?.src || '',
-    logo,
-    variation: builderVariation
-  };
-}
-
-function drawBuilderPreview(design, isExample) {
-  const canvas = $('builderPreviewCanvas');
-  const fit = Math.min(660 / design.w, 410 / design.h);
-  canvas.width = Math.max(1, Math.round(design.w * fit));
-  canvas.height = Math.max(1, Math.round(design.h * fit));
-  const context = canvas.getContext('2d');
-  context.setTransform(canvas.width / design.w, 0, 0, canvas.height / design.h, 0, 0);
-  paint(context, false, design);
-  $('builderPreviewMode').textContent = isExample ? 'แบบตัวอย่าง' : 'แบบจากบรีฟของคุณ';
-  $('builderPreviewNote').textContent = isExample ? 'ใส่ขนาดและบรีฟเพื่อดูแบบของคุณ' :
-    $('popupUseAi').checked && !design.bgImage ? 'ภาพ AI จะเริ่มสร้างหลังเปิด Studio' : 'แก้ข้อความและเลเยอร์ต่อได้ใน Studio';
-  $('builderPreviewSize').textContent = design.w + ' × ' + design.h + ' px';
-}
-
-function previewExample() {
-  drawBuilderPreview(composePopup({
-    width: 1200, height: 780, brief: 'น้ำเงิน', variation: 52,
-    copy: { headline: 'เชิญผู้ถือหุ้นเสนอวาระประชุม', detail: 'เสนอวาระล่วงหน้าสำหรับการประชุมสามัญผู้ถือหุ้น' },
-    button: { text: 'ดูรายละเอียด', url: '' }
-  }), true);
-}
-
-let builderPreviewTimer;
-function queueBuilderPreview() {
-  const revision = ++builderPreviewRevision;
-  clearTimeout(builderPreviewTimer);
-  builderPreviewTimer = setTimeout(async () => {
-    const widthField = $('popupWidth');
-    const heightField = $('popupHeight');
-    const fields = builderCopy();
-    if (!widthField.validity.valid || !heightField.validity.valid ||
-        (!fields.copy.headline && !fields.copy.detail)) {
-      previewExample();
-      return;
-    }
-    try {
-      const assets = await builderAssetOptions();
-      if (revision !== builderPreviewRevision || $('popupBuilder').hidden) return;
-      drawBuilderPreview(composePopup({
-        ...fields, ...assets, width: widthField.valueAsNumber, height: heightField.valueAsNumber
-      }), false);
-    } catch (problem) {
-      if (revision !== builderPreviewRevision) return;
-      $('builderPreviewNote').textContent = problem.message || 'ยังแสดงตัวอย่างไม่ได้';
-    }
-  }, 160);
-}
-
-function openPopupBuilder() {
-  setStudioView(false);
-  queueBuilderPreview();
-}
-
-$('openPopupBuilder').addEventListener('click', openPopupBuilder);
-$('openStudioWorkspace').addEventListener('click', () => showStudioWorkspace(true));
-$('popupBuilderForm').addEventListener('input', queueBuilderPreview);
-$('popupBuilderForm').addEventListener('change', queueBuilderPreview);
-$('popupBuilderForm').addEventListener('submit', async event => {
-  event.preventDefault();
-  const form = event.currentTarget;
-  if (!form.reportValidity()) return;
-  const fields = builderCopy();
-  const width = $('popupWidth').valueAsNumber;
-  const height = $('popupHeight').valueAsNumber;
-  const error = $('popupBuilderError');
-  const submit = $('createPopup');
-  error.textContent = '';
-  if (!fields.copy.headline && !fields.copy.detail) {
-    error.textContent = 'ใส่บรีฟหรือข้อความที่ต้องการให้แสดงก่อนสร้าง Popup';
-    $('popupBrief').focus();
-    return;
-  }
-  if (fields.rawUrl && !fields.button?.url) {
-    error.textContent = 'ลิงก์ปลายทางต้องขึ้นต้นด้วย https:// หรือ http://';
-    return;
-  }
-  const useAi = $('popupUseAi').checked && !$('popupBackground').files[0];
-  const imageBrief = $('popupAiPrompt').value.trim() || fields.brief ||
-    [fields.copy.headline, fields.copy.detail].filter(Boolean).join(' ');
-  submit.disabled = true;
-  try {
-    const assets = await builderAssetOptions();
-    const design = composePopup({ ...fields, ...assets, width, height });
-    stopPopupBackground();
-    remember();
-    state = design;
-    selected = design.items.find(item => item.type === 'text')?.id ?? null;
-    $('w').value = width;
-    $('h').value = height;
-    showStudioWorkspace(true);
-    notice('สร้าง Popup แล้ว แก้ข้อความ พื้นหลัง และปุ่มได้ก่อนส่งออก');
-    if (useAi) void generatePopupBackground(design, imageBrief);
-  } catch (problem) {
-    error.textContent = problem.message || 'สร้าง Popup ไม่สำเร็จ';
-  } finally {
-    submit.disabled = false;
-  }
-});
-
-
-let popupImageJob = null;
-
-function popupImageWorkerMain() {
-  self.addEventListener('message', async ({ data: prompt }) => {
-    try {
-      const adapter = await navigator.gpu?.requestAdapter();
-      if (!adapter) throw new Error('WebGPU adapter unavailable');
-      const { env, AutoProcessor, MultiModalityCausalLM } = await import(
-        'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.1/dist/transformers.min.js'
-      );
-      env.allowLocalModels = false;
-      env.backends.onnx.wasm.numThreads = 1;
-      const modelId = 'onnx-community/Janus-Pro-1B-ONNX';
-      const fp16 = adapter.features.has('shader-f16');
-      const visionDtype = fp16 ? 'fp16' : 'fp32';
-      const [processor, model] = await Promise.all([
-        AutoProcessor.from_pretrained(modelId),
-        MultiModalityCausalLM.from_pretrained(modelId, {
-          dtype: {
-            prepare_inputs_embeds: fp16 ? 'q4' : 'fp32',
-            language_model: fp16 ? 'q4f16' : 'q4',
-            lm_head: visionDtype, gen_head: visionDtype, gen_img_embeds: visionDtype, image_decode: 'fp32'
-          },
-          device: {
-            prepare_inputs_embeds: 'wasm', language_model: 'webgpu', lm_head: 'webgpu',
-            gen_head: 'webgpu', gen_img_embeds: 'webgpu', image_decode: 'webgpu'
-          }
-        })
-      ]);
-      self.postMessage({ phase: 'generating' });
-      const inputs = await processor([{ role: '<|User|>', content: prompt }], { chat_template: 'text_to_image' });
-      const count = processor.num_image_tokens;
-      const [image] = await model.generate_images({
-        ...inputs, do_sample: true, min_new_tokens: count, max_new_tokens: count
-      });
-      self.postMessage({ blob: await image.toBlob() });
-    } catch (error) {
-      self.postMessage({ error: String(error) });
-    }
-  }, { once: true });
-}
-
-function stopPopupBackground(message = '') {
-  const job = popupImageJob;
-  popupImageJob = null;
-  if (job) {
-    job.worker.terminate();
-    URL.revokeObjectURL(job.url);
-  }
-  $('cancelPopupAi').hidden = true;
-  $('popupAiStatus').textContent = message;
-}
-
-function generatePopupBackground(design, brief) {
-  const status = $('popupAiStatus');
-  if (!navigator.gpu || typeof OffscreenCanvas !== 'function') {
-    status.textContent = 'เครื่องนี้รันภาพ AI ไม่ได้ ใช้พื้นหลังที่จัดไว้หรืออัปโหลดรูปแทนได้';
-    return;
-  }
-  try {
-    const entry = '(' + popupImageWorkerMain.toString() + ')();';
-    const url = URL.createObjectURL(new Blob([entry], { type: 'text/javascript' }));
-    let worker;
-    try {
-      worker = new Worker(url, { type: 'module' });
-    } catch (error) {
-      URL.revokeObjectURL(url);
-      throw error;
-    }
-    const job = { worker, url };
-    popupImageJob = job;
-    status.textContent = 'กำลังโหลดโมเดลสร้างภาพ AI…';
-    $('cancelPopupAi').hidden = false;
-    const fail = error => {
-      console.warn('Popup image generation', error);
-      if (popupImageJob === job) stopPopupBackground('สร้างภาพ AI ไม่สำเร็จ คุณยังใช้พื้นหลังที่จัดไว้ได้');
-    };
-    worker.onerror = fail;
-    worker.onmessage = async ({ data }) => {
-      if (popupImageJob !== job) return;
-      if (data.error) return fail(data.error);
-      if (data.phase === 'generating') {
-        status.textContent = 'AI กำลังสร้างภาพพื้นหลังในเครื่อง…';
-        return;
+        setFont(block.weight, block.px);
+        ctx.textAlign = isButton ? 'center' : 'left';
+        ctx.fillStyle = isButton ? '#16223c' : block.kind === 'body' ? '#ebefff' : '#fff';
+        const left = block.x + (isButton ? block.w / 2 : 0);
+        const top = block.y + (block.h - block.lines.length * block.lineH) / 2;
+        block.lines.forEach((line, n) => ctx.fillText(line, left, top + (n + .5) * block.lineH));
       }
-      try {
-        const file = new File([data.blob], 'popup-ai.png', { type: data.blob.type || 'image/png' });
-        const { src } = await readImage(file);
-        if (popupImageJob !== job) return;
-        if (state !== design || state.bgImage) return stopPopupBackground();
-        remember();
-        state.bgImage = src;
-        state.bgLayer = 'behind';
-        state.bgShade = Math.max(28, state.bgShade || 0);
-        refresh();
-        stopPopupBackground('ใช้ภาพพื้นหลัง AI แล้ว แก้ไขหรือส่งออกได้');
-      } catch (error) {
-        fail(error);
-      }
-    };
-    const orientation = design.w > design.h ? 'wide horizontal' : design.w < design.h ? 'vertical' : 'square';
-    const prompt = [
-      'Create a ' + orientation + ' background image for a professional website announcement.',
-      'Visual brief: ' + brief.slice(0, 600) + '.',
-      'Palette: ' + [design.bgA, design.bgB, design.bgAccent].join(', ') + '.',
-      'Quiet central negative space, tasteful detail toward outer edges. Background artwork only. No words, no logos, no buttons.'
-    ].join(' ');
-    worker.postMessage(prompt);
-  } catch (error) {
-    console.warn('Popup image generation', error);
-    stopPopupBackground('เปิดโมเดลสร้างภาพไม่ได้ คุณยังใช้พื้นหลังที่จัดไว้ได้');
+      canvas.setAttribute('aria-label', text);
+      painted = true;
+      if (link && !url) error = 'ใส่ลิงก์ที่ขึ้นต้นด้วย https:// หรือ http://';
+      else if (link && !button) error = 'ใส่ข้อความบนปุ่มเพื่อใช้ลิงก์นี้';
+      if (input && !error) artwork = {w,h,text,button,url,box:blocks.find(block => block.kind === 'button')};
+      byId('dimensions').textContent = (input ? '' : 'ตัวอย่าง · ') + w + ' × ' + h + ' px';
+    }
   }
+  if (!painted) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    canvas.setAttribute('aria-label',error);
+    byId('dimensions').textContent = 'ตรวจสอบชิ้นงาน';
+  }
+  byId('warning').textContent = error;
+  byId('download').disabled = !artwork;
+}
+function refresh() {
+  cancelAnimationFrame(pendingFrame);
+  pendingFrame = requestAnimationFrame(render);
 }
 
-$('cancelPopupAi').addEventListener('click', () => stopPopupBackground('หยุดสร้างภาพ AI แล้ว'));
-$('popupUseAi').addEventListener('change', () => { $('popupAiPromptWrap').hidden = !$('popupUseAi').checked; });
-
-refresh();
-openPopupBuilder();
-</script></body></html>
+function exportHtml(design) {
+  const doc = document.implementation.createHTMLDocument('Popup');
+  doc.documentElement.lang = 'th';
+  const meta = doc.createElement('meta');
+  const encoding = doc.createElement('meta');
+  encoding.setAttribute('charset','utf-8');
+  meta.name = 'viewport';
+  meta.content = 'width=device-width,initial-scale=1';
+  doc.head.prepend(encoding, meta);
+  doc.body.style.margin = '0';
+  const frame = doc.createElement('div');
+  frame.style.cssText = 'position:relative;max-width:' + design.w + 'px;margin:auto';
+  const image = doc.createElement('img');
+  image.src = canvas.toDataURL('image/png');
+  image.alt = design.text + (design.button ? ' ' + design.button : '');
+  image.style.cssText = 'display:block;width:100%;height:auto';
+  frame.append(image);
+  if (design.url && design.box) {
+    const a = doc.createElement('a'), b = design.box;
+    a.href = design.url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.setAttribute('aria-label',design.button);
+    a.style.cssText = 'position:absolute;left:' + 100*b.x/design.w + '%;top:' + 100*b.y/design.h + '%;width:' + 100*b.w/design.w + '%;height:' + 100*b.h/design.h + '%';
+    frame.append(a);
+  }
+  doc.body.append(frame);
+  return new Blob(['<!doctype html>\n',doc.documentElement.outerHTML], {type:'text/html;charset=utf-8'});
+}
+byId('download').onclick = async () => {
+  cancelAnimationFrame(pendingFrame);
+  render();
+  if (!artwork) return;
+  const design = artwork;
+  const ext = byId('format').value.toLowerCase();
+  const mime = {png:'image/png',jpg:'image/jpeg',webp:'image/webp'}[ext];
+  try {
+    const blob = ext === 'html' ? exportHtml(design) : await new Promise(resolve => canvas.toBlob(resolve,mime,.94));
+    if (!blob || (mime && blob.type !== mime)) throw new Error();
+    const a = document.createElement('a');
+    const objectUrl = URL.createObjectURL(blob);
+    a.href = objectUrl;
+    a.download = 'popup-' + design.w + 'x' + design.h + '.' + ext;
+    document.body.append(a);
+    a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 30000);
+    byId('status').textContent = 'เตรียมไฟล์ ' + ext.toUpperCase() + ' แล้ว';
+  } catch { byId('status').textContent = 'ส่งออกไฟล์ไม่ได้ ลองเปลี่ยนรูปแบบไฟล์หรือขนาดชิ้นงาน'; }
+};
+byId('sample').onclick = () => { byId('copy').value = example; variation = 0; refresh(); };
+byId('variation').onclick = () => { variation++; refresh(); };
+for (const id of ['width','height','copy','buttonText','buttonUrl']) byId(id).addEventListener('input', refresh);
+render();
+</script>
+</body>
+</html>
