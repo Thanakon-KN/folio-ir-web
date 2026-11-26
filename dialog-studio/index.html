@@ -166,13 +166,128 @@ canvas { display: block; }
   color: var(--ink); background: var(--surface); box-shadow: 0 22px 75px #201b464d;
 }
 .export::backdrop { background: #1f1c3a80; }
-.builder-dialog { width: min(640px, calc(100% - 24px)); }
-.builder-dialog form.builder-form { margin-top: 14px; }
-.builder-dialog summary { margin-top: 12px; cursor: pointer; font-weight: 600; }
-.builder-dialog .builder-check { display: flex; gap: 8px; align-items: center; }
-.builder-check input { width: auto; margin: 0; }
-.builder-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; margin-top: 16px; gap: 8px; }
-.builder-dialog #popupBrief { min-height: 94px; }
+/* The brief and preview share the same workspace before opening the editor. */
+.appbar {
+  background: #fff;
+  color: #211f38;
+  border-bottom: 1px solid #e8e5f1;
+  padding-inline: clamp(16px, 3.2vw, 52px);
+}
+.appbar .header-action { color: #37334f; border-color: #e5e0f0; }
+.appbar .header-action:hover { background: #f3efff; }
+.appbar .primary { background: #5139ca; color: #fff; border-color: #5139ca; }
+.appbar .primary:hover { background: #4030a4; }
+.app-actions { margin-left: auto; }
+.studio-nav { display: flex; align-items: center; gap: 4px; padding: 3px; border-radius: 10px; background: #f2eff8; }
+.studio-nav button { background: transparent; border-color: transparent; color: #5e5675; padding: 5px 12px; }
+.studio-nav button[aria-current="page"] { background: #fff; border-color: #e7e0f3; color: #4730aa; }
+.builder-page {
+  --builder-text: #242039;
+  --builder-muted: #625a72;
+  min-height: calc(100dvh - var(--header-height));
+  background: radial-gradient(ellipse at 98% 0%, #eae4ff 0, transparent 40%), #f8f7fc;
+  color: var(--builder-text);
+  padding: clamp(25px, 4vw, 58px) clamp(16px, 4vw, 56px);
+}
+.builder-grid {
+  width: min(1260px, 100%);
+  display: grid;
+  grid-template-columns: minmax(350px, .9fr) minmax(0, 1.3fr);
+  gap: clamp(20px, 3vw, 48px);
+  margin: 0 auto;
+  align-items: start;
+}
+.builder-title {
+  margin: 0 0 8px;
+  color: #211936;
+  font-size: clamp(27px, 3.9vw, 57px);
+  font-weight: 750;
+  letter-spacing: -.04em;
+  line-height: 1.2;
+}
+.builder-intro { margin: 0 0 20px; color: var(--builder-muted); font-size: 14px; }
+.builder-form {
+  border: 1px solid #e9e3f2;
+  border-radius: 19px;
+  background: #fff;
+  padding: clamp(15px, 2vw, 24px);
+  box-shadow: 0 6px 20px #2d205107;
+}
+.builder-form fieldset { border: 0; padding: 0; margin: 0 0 14px; min-width: 0; }
+.builder-form legend { font-weight: 680; font-size: 13px; padding: 0; }
+.builder-form label { color: #3d354f; }
+.builder-form input, .builder-form textarea {
+  background: #fbfaff;
+  border-color: #e5e0ee;
+  border-radius: 9px;
+  padding: 9px 11px;
+}
+.builder-form input::placeholder, .builder-form textarea::placeholder { color: #7e778b; }
+.builder-form #popupBrief { min-height: 104px; }
+.builder-form details { border-top: 1px solid #eee9f5; padding: 10px 0; }
+.builder-form summary { color: #3e3554; font-size: 13px; font-weight: 650; }
+.builder-form details[open] summary { margin-bottom: 7px; }
+.builder-form .builder-check { display: flex; gap: 9px; align-items: center; font-weight: 650; margin: 0; }
+.builder-check input { width: auto; margin: 0; accent-color: #5139ca; }
+.builder-ai { background: #f8f5ff; border: 1px solid #eee7fc; padding: 10px 12px; border-radius: 10px; }
+.builder-ai p { color: var(--builder-muted); margin-bottom: 0; }
+.builder-actions { margin-top: 15px; }
+.builder-actions button { width: 100%; min-height: 45px; background: #5139ca; border-color: #5139ca; }
+.builder-actions button:hover { background: #402da4; }
+#popupBuilderError:not(:empty) { margin-top: 10px; color: #9e304e; }
+.builder-preview {
+  position: sticky;
+  top: 22px;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  border-radius: 23px;
+  border: 1px solid #ddd4f1;
+  background: #fefcff;
+  box-shadow: 0 17px 50px #37265e10;
+}
+.builder-preview header, .builder-preview figcaption {
+  padding: 13px clamp(12px, 2vw, 22px);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 5px 12px;
+}
+.builder-preview header { border-bottom: 1px solid #e9e2f3; }
+.builder-preview header h2 { margin: 0; font-size: 14px; }
+.builder-preview figcaption { color: var(--builder-muted); font-size: 12px; }
+.builder-preview figcaption span:last-child { font-variant-numeric: tabular-nums; }
+.preview-mode { color: #553ab0; font-size: 12px; font-weight: 650; }
+.builder-preview-board {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: clamp(290px, 41vw, 530px);
+  padding: 22px clamp(15px, 4vw, 60px);
+  background:
+    radial-gradient(ellipse at 75% 0%, #efe6ff 0, transparent 54%),
+    radial-gradient(#b9aed7 1px, transparent 1px) 50% 50% / 17px 17px,
+    #ece8f8;
+}
+#builderPreviewCanvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 10px;
+  box-shadow: 0 18px 48px #241a4545, 0 0 0 1px #37275633;
+}
+@media (max-width: 800px) {
+  .builder-grid { grid-template-columns: minmax(0, 1fr); }
+  .builder-preview { position: static; }
+  .builder-preview-board { min-height: clamp(240px, 55vw, 430px); }
+}
+@media (max-width: 560px) {
+  .appbar { flex-wrap: wrap; }
+  .studio-nav { order: 2; width: 100%; }
+  .studio-nav button { flex: 1; }
+  .app-actions button { font-size: 12px; padding-inline: 7px; }
+}
 .stage-note #popupAiStatus { color: #4a399c; }
 #cancelPopupAi { padding: 3px 8px; font-size: 11px; }
 .export-heading { display: flex; justify-content: space-between; gap: 12px; }
@@ -203,15 +318,18 @@ canvas { display: block; }
 </style></head><body>
 <header class="appbar">
   <div class="brand"><span class="logo" aria-hidden="true"></span><strong>Dialog Studio</strong></div>
+  <nav class="studio-nav" aria-label="หน้าทำงาน">
+    <button id="openPopupBuilder" type="button" aria-current="page" aria-controls="popupBuilder">สร้าง Popup</button>
+    <button id="openStudioWorkspace" type="button" aria-controls="studioWorkspace">ปรับแต่ง</button>
+  </nav>
   <div class="app-actions">
-    <button id="openPopupBuilder" class="header-action" type="button">สร้าง Popup</button>
     <button id="loadProject" class="header-action" type="button">เปิดงาน</button>
-    <button id="saveProject" class="header-action" type="button">บันทึกงาน</button>
-    <button id="openExport" class="primary" type="button">ส่งออก <span aria-hidden="true">↗</span></button>
+    <button id="saveProject" class="header-action" type="button" hidden>บันทึกงาน</button>
+    <button id="openExport" class="primary" type="button" hidden>ส่งออก <span aria-hidden="true">↗</span></button>
   </div>
   <input id="projectFile" type="file" accept="application/json,.json" hidden>
 </header>
-<div class="layout">
+<div id="studioWorkspace" class="layout" hidden>
   <aside class="left" aria-label="เครื่องมือออกแบบ">
     <nav class="tool-nav" aria-label="แผงเครื่องมือ">
       <button type="button" aria-pressed="true" aria-controls="elementsPanel">เพิ่ม</button>
@@ -291,16 +409,18 @@ canvas { display: block; }
   </main>
   <aside class="right"><div class="inspector-heading"><h2>ปรับแต่ง</h2><span id="selectionKind"></span></div><div id="empty" class="empty">เลือกข้อความ รูปภาพ หรือปุ่มบนชิ้นงาน เพื่อปรับแต่งที่นี่</div><div id="properties" class="hidden"><div><label for="content">ข้อความ</label><textarea id="content"></textarea></div><div id="urlWrap"><label for="url">ลิงก์ปลายทางปุ่ม</label><input id="url" placeholder="https://example.com"></div><div><label>ตำแหน่ง · px</label><div class="grid"><input id="x" type="number" aria-label="ตำแหน่ง X"><input id="y" type="number" aria-label="ตำแหน่ง Y"></div></div><div><label>ขนาดกล่อง · px</label><div class="grid"><input id="ew" type="number" min="20" aria-label="ความกว้างองค์ประกอบ"><input id="eh" type="number" min="20" aria-label="ความสูงองค์ประกอบ"></div></div><div id="fontWrap"><label for="fontSize">ขนาดตัวอักษร · px</label><input id="fontSize" type="number" min="8" max="400"></div><div><label for="color">สีตัวอักษร</label><input id="color" type="color"></div><div id="fillWrap"><label for="fill">สีปุ่ม</label><input id="fill" type="color"></div><div><label for="align">จัดแนวข้อความ</label><select id="align"><option value="left">ชิดซ้าย</option><option value="center">กึ่งกลาง</option><option value="right">ชิดขวา</option></select></div><div><label for="weight">น้ำหนักตัวอักษร</label><select id="weight"><option value="400">ปกติ</option><option value="700">หนา</option></select></div><div><label>จัดวางและลำดับ</label><div class="group"><button id="center">จัดกลาง</button><button id="forward">ขึ้นหน้า</button><button id="backward">ลงหลัง</button></div></div><div><div class="divider"></div><div class="group"><button id="duplicate">ทำสำเนา</button><button id="delete">ลบ</button></div></div></div></aside>
 </div>
-<dialog id="popupBuilder" class="export builder-dialog" aria-labelledby="popupBuilderTitle">
-  <div class="export-heading">
-    <div><h2 id="popupBuilderTitle">สร้าง Popup จากบรีฟ</h2><p>กำหนดขนาด ใส่บรีฟ แล้วเว็บจะจัดพื้นหลัง ข้อความ และปุ่มให้แก้ต่อได้</p></div>
-    <form method="dialog"><button type="submit" aria-label="ปิดหน้าต่างสร้าง Popup">×</button></form>
-  </div>
+<main id="popupBuilder" class="builder-page" aria-labelledby="popupBuilderTitle">
+  <div class="builder-grid">
+    <section aria-labelledby="popupBuilderTitle">
+      <h1 id="popupBuilderTitle" class="builder-title">สร้าง Popup จากบรีฟ</h1>
+      <p class="builder-intro">กำหนดขนาดและใส่เนื้อหา แล้วดูแบบที่เว็บจัดให้</p>
   <form id="popupBuilderForm" class="builder-form">
+    <fieldset><legend>ขนาดชิ้นงาน</legend>
     <div class="grid">
       <div><label for="popupWidth">ความกว้าง (px)</label><input id="popupWidth" type="number" required min="240" max="4000" step="1" placeholder="1200"></div>
       <div><label for="popupHeight">ความสูง (px)</label><input id="popupHeight" type="number" required min="180" max="4000" step="1" placeholder="800"></div>
     </div>
+    </fieldset>
     <label for="popupBrief">บรีฟหรือข้อความที่ต้องการแสดง</label>
     <textarea id="popupBrief" maxlength="1600" placeholder="เช่น เชิญผู้ถือหุ้นเสนอวาระประชุม AGM&#10;พื้นหลังห้องประชุมโทนแดงเข้ม ดูเป็นทางการ"></textarea>
     <details>
@@ -321,13 +441,22 @@ canvas { display: block; }
       <label for="popupLogo">โลโก้ที่จะวางบน Popup</label>
       <input id="popupLogo" type="file" accept="image/png,image/jpeg,image/webp">
     </details>
-    <label class="builder-check"><input id="popupUseAi" type="checkbox"> สร้างภาพพื้นหลังด้วย AI ในเบราว์เซอร์</label>
+    <div class="builder-ai">
+    <label class="builder-check"><input id="popupUseAi" type="checkbox"> สร้างภาพพื้นหลังด้วย AI</label>
     <div id="popupAiPromptWrap" hidden><label for="popupAiPrompt">คำอธิบายภาพเพิ่มเติม (ถ้ามี)</label><input id="popupAiPrompt" maxlength="360" placeholder="เช่น Dark red boardroom, soft lighting, empty center"></div>
     <p>ครั้งแรกต้องโหลดโมเดลและใช้เครื่องที่รองรับ WebGPU ถ้ามีรูปพื้นหลังที่อัปโหลด เว็บจะใช้รูปนั้น</p>
+    </div>
     <div id="popupBuilderError" role="alert"></div>
-    <div class="builder-actions"><button id="createPopup" class="primary" type="submit">สร้าง Popup</button></div>
+    <div class="builder-actions"><button id="createPopup" class="primary" type="submit">สร้างและเปิด Studio <span aria-hidden="true">↗</span></button></div>
   </form>
-</dialog>
+    </section>
+    <figure class="builder-preview">
+      <header><h2>ตัวอย่างชิ้นงาน</h2><span id="builderPreviewMode" class="preview-mode">แบบตัวอย่าง</span></header>
+      <div class="builder-preview-board"><canvas id="builderPreviewCanvas" width="640" height="420" aria-label="ภาพตัวอย่าง Popup"></canvas></div>
+      <figcaption><span id="builderPreviewNote">ใส่ขนาดและบรีฟเพื่อดูแบบของคุณ</span><span id="builderPreviewSize"></span></figcaption>
+    </figure>
+  </div>
+</main>
 <dialog id="exportDialog" class="export" aria-labelledby="exportTitle">
   <div class="export-heading">
     <div><h2 id="exportTitle">ส่งออกชิ้นงาน</h2><p>ดาวน์โหลดเป็นภาพ หรือเลือก HTML เพื่อให้ปุ่มคลิกได้</p></div>
@@ -674,8 +803,8 @@ function paintBackground(context, design = state){
  paintExtraPattern(context, style, w, h, random);
  context.restore();const shade=(design.bgShade??0)/100;if(shade){context.fillStyle=`rgba(0,0,0,${shade})`;context.fillRect(0,0,w,h)}
 }
-function paint(context,selection=false){paintBackground(context);
-for(const i of state.items){context.save();if(i.type==='image'){paintImage(context,i)}else{if(i.type==='button')paintButton(context,i);context.beginPath();context.rect(i.x,i.y,i.w,i.h);context.clip();context.font=`${i.weight} ${i.size}px Arial,"Segoe UI",sans-serif`;context.fillStyle=i.color;context.textBaseline='top';context.textAlign=i.align;const padding=i.type==='button'?12:0,lines=linesFor(context,i.text,Math.max(1,i.w-padding*2)),lh=i.size*1.35,total=lines.length*lh,x=i.align==='center'?i.x+i.w/2:i.align==='right'?i.x+i.w-padding:i.x+padding,y=i.type==='button'?i.y+(i.h-total)/2:i.y;lines.forEach((line,n)=>context.fillText(line,x,y+n*lh))}context.restore();if(selection&&i.id===selected){context.save();context.strokeStyle='#71d5b3';context.lineWidth=2*state.w/Math.max(1,canvas.clientWidth);context.setLineDash([8,5]);context.strokeRect(i.x,i.y,i.w,i.h);context.restore()}}
+function paint(context,selection=false,design=state){paintBackground(context,design);
+for(const i of design.items){context.save();if(i.type==='image'){paintImage(context,i)}else{if(i.type==='button')paintButton(context,i);context.beginPath();context.rect(i.x,i.y,i.w,i.h);context.clip();context.font=`${i.weight} ${i.size}px Arial,"Segoe UI",sans-serif`;context.fillStyle=i.color;context.textBaseline='top';context.textAlign=i.align;const padding=i.type==='button'?12:0,lines=linesFor(context,i.text,Math.max(1,i.w-padding*2)),lh=i.size*1.35,total=lines.length*lh,x=i.align==='center'?i.x+i.w/2:i.align==='right'?i.x+i.w-padding:i.x+padding,y=i.type==='button'?i.y+(i.h-total)/2:i.y;lines.forEach((line,n)=>context.fillText(line,x,y+n*lh))}context.restore();if(selection&&i.id===selected){context.save();context.strokeStyle='#71d5b3';context.lineWidth=2*design.w/Math.max(1,canvas.clientWidth);context.setLineDash([8,5]);context.strokeRect(i.x,i.y,i.w,i.h);context.restore()}}
 }
 function paintButton(context,i){context.save();context.beginPath();const border=i.borderWidth??0,inset=border/2;context.roundRect(i.x+inset,i.y+inset,Math.max(1,i.w-border),Math.max(1,i.h-border),Math.max(0,Math.min(i.radius??0,i.w/2,i.h/2)));if(i.buttonStyle!=='outline'&&i.buttonStyle!=='text'){context.globalAlpha=(i.fillOpacity??100)/100;context.fillStyle=i.fill;if(i.buttonStyle==='gradient'){const g=context.createLinearGradient(i.x,i.y,i.x+i.w,i.y+i.h);g.addColorStop(0,i.fill);g.addColorStop(1,i.fillEnd||'#528b76');context.fillStyle=g}if(i.shadow){context.shadowColor='#00000040';context.shadowBlur=12;context.shadowOffsetY=5}context.fill()}context.shadowColor='transparent';context.globalAlpha=1;if(i.buttonStyle!=='text'&&(border>0||i.buttonStyle==='outline')){context.strokeStyle=i.borderColor||i.color;context.lineWidth=border||2;context.stroke()}context.restore()}
 function draw(){if(canvas.width!==state.w)canvas.width=state.w;if(canvas.height!==state.h)canvas.height=state.h;paint(ctx,true);$('dimensions').textContent=`${state.w} × ${state.h} px`;$('undo').disabled=!history.length;$('redo').disabled=!future.length}
@@ -702,7 +831,7 @@ function cleanCanvas(){const c=document.createElement('canvas');c.width=state.w;
 document.querySelectorAll('[data-format]').forEach(button=>button.onclick=()=>cleanCanvas().toBlob(blob=>{if(!blob)return notice('ส่งออกภาพไม่สำเร็จ');const ext=blob.type==='image/jpeg'?'jpg':blob.type==='image/webp'?'webp':'png';download(blob,`intro-dialog-${state.w}x${state.h}.${ext}`);notice('ส่งออกภาพแล้ว')},button.dataset.format,.94));
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}function safeUrl(value){try{const u=new URL(value);return ['https:','http:'].includes(u.protocol)?u.href:''}catch{return ''}}
 function htmlCode(){const image=cleanCanvas().toDataURL('image/png');const links=state.items.filter(i=>i.type==='button'&&safeUrl(i.url)).map(i=>`<a href="${escapeHtml(safeUrl(i.url))}" target="_blank" rel="noopener" aria-label="${escapeHtml(i.text)}" style="position:absolute;left:${i.x/state.w*100}%;top:${i.y/state.h*100}%;width:${i.w/state.w*100}%;height:${i.h/state.h*100}%"></a>`).join('\n');return `<!doctype html>\n<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Intro Dialog</title></head><body style="margin:0"><div style="position:relative;max-width:${state.w}px"><img src="${image}" alt="${escapeHtml(state.items.filter(i=>i.type==='text').map(i=>i.text).join(' '))}" width="${state.w}" height="${state.h}" style="display:block;width:100%;height:auto">${links}</div></body></html>`}
-$('exportHtml').onclick=()=>{download(new Blob([htmlCode()],{type:'text/html;charset=utf-8'}),'intro-dialog.html');notice('ส่งออก HTML พร้อมภาพและพื้นที่ลิงก์ปุ่มแล้ว')};$('showCode').onclick=()=>{$('codeOutput').value=htmlCode();$('codeOutput').classList.toggle('hidden');notice('คัดลอกโค้ดจากช่องด้านล่างได้ ลิงก์ต้องขึ้นต้นด้วย http:// หรือ https://')};$('saveProject').onclick=()=>download(new Blob([snapshot()],{type:'application/json'}),'intro-dialog-project.json');$('loadProject').onclick=()=>$('projectFile').click();$('projectFile').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{const text=await file.text(),data=JSON.parse(text);if(!Number.isInteger(data.w)||data.w<240||data.w>4000||!Number.isInteger(data.h)||data.h<180||data.h>4000||!Array.isArray(data.items)||data.items.some(i=>!['text','button','image'].includes(i.type)||!['x','y','w','h'].every(k=>Number.isFinite(i[k]))))throw Error();remember();restore(text);notice('เปิดโปรเจกต์แล้ว')}catch{notice('เปิดไฟล์ไม่สำเร็จ กรุณาใช้ไฟล์โปรเจกต์ที่บันทึกจากโปรแกรมนี้')}e.target.value=''};
+$('exportHtml').onclick=()=>{download(new Blob([htmlCode()],{type:'text/html;charset=utf-8'}),'intro-dialog.html');notice('ส่งออก HTML พร้อมภาพและพื้นที่ลิงก์ปุ่มแล้ว')};$('showCode').onclick=()=>{$('codeOutput').value=htmlCode();$('codeOutput').classList.toggle('hidden');notice('คัดลอกโค้ดจากช่องด้านล่างได้ ลิงก์ต้องขึ้นต้นด้วย http:// หรือ https://')};$('saveProject').onclick=()=>download(new Blob([snapshot()],{type:'application/json'}),'intro-dialog-project.json');$('loadProject').onclick=()=>$('projectFile').click();$('projectFile').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{const text=await file.text(),data=JSON.parse(text);if(!Number.isInteger(data.w)||data.w<240||data.w>4000||!Number.isInteger(data.h)||data.h<180||data.h>4000||!Array.isArray(data.items)||data.items.some(i=>!['text','button','image'].includes(i.type)||!['x','y','w','h'].every(k=>Number.isFinite(i[k]))))throw Error();remember();restore(text);showStudioWorkspace();notice('เปิดโปรเจกต์แล้ว')}catch{notice('เปิดไฟล์ไม่สำเร็จ กรุณาใช้ไฟล์โปรเจกต์ที่บันทึกจากโปรแกรมนี้')}e.target.value=''};
 const palettes={plain:['#173e37','#6b8b70','#dcebc4'],corporate:['#162d48','#365b79','#b6d2e8'],luxury:['#241e1b','#655036','#e9ca88'],nature:['#18483b','#789564','#d7e4aa'],tech:['#142445','#235b70','#80deed'],celebration:['#722851','#bd6978','#ffe0a6']};
 $('bgStyle').onchange = () => {
   remember();
@@ -1579,27 +1708,27 @@ function samplePopupReference(image) {
     align: leftWeighted ? 'left' : 'center' };
 }
 
-function popupDesignDirection(brief, reference) {
+function popupDesignDirection(brief, reference, variation) {
   const match = popupPalettes.find(preset => preset.match.test(brief));
   const defaults = [
     { colors: ['#152339', '#365576', '#b2ddf1'], pattern: 'ribbons' },
     { colors: ['#2a2342', '#53457a', '#d5c5f7'], pattern: 'contours' },
     { colors: ['#132d31', '#386566', '#a8e1cc'], pattern: 'diagonal' }
   ];
-  const fallback = defaults[Math.floor(Math.random() * defaults.length)];
+  const fallback = defaults[variation % defaults.length];
   const colors = match?.colors || reference?.colors || fallback.colors;
   const align = /ชิดซ้าย|วางซ้าย|left.align/i.test(brief) ? 'left' :
     /กึ่งกลาง|ตรงกลาง|center/i.test(brief) ? 'center' : reference?.align || 'center';
   return { colors, align, pattern: match?.pattern || fallback.pattern };
 }
 
-function composePopup({ width, height, copy, button, background, reference, brief, logo }) {
-  const direction = popupDesignDirection(brief, reference);
+function composePopup({ width, height, copy, button, background, reference, brief, logo, variation = 1 }) {
+  const direction = popupDesignDirection(brief, reference, variation);
   const [dark, mid, accent] = direction.colors;
   const design = {
     w: width, h: height, bgA: dark, bgB: mid, bgAccent: accent,
-    bgPattern: background ? 'plain' : direction.pattern, bgSeed: Math.floor(Math.random() * 1000000),
-    bgIntensity: 21, bgAngle: 122 + Math.round(Math.random() * 22), bgImage: background || '',
+    bgPattern: background ? 'plain' : direction.pattern, bgSeed: variation,
+    bgIntensity: 21, bgAngle: 122 + variation % 23, bgImage: background || '',
     bgLayer: 'behind', bgShade: background ? 28 : 0, bgColorOpacity: 45, items: []
   };
   const typeMeasure = document.createElement('canvas').getContext('2d');
@@ -1646,59 +1775,148 @@ function composePopup({ width, height, copy, button, background, reference, brie
   throw new Error('ข้อความยาวเกินขนาดนี้ กรุณาเพิ่มขนาดชิ้นงานหรือลดข้อความ');
 }
 
+const builderVariation = Math.floor(Math.random() * 1000000);
+const builderImageCache = new WeakMap();
+let builderPreviewRevision = 0;
+
+function setStudioView(editor) {
+  $('popupBuilder').hidden = editor;
+  $('studioWorkspace').hidden = !editor;
+  $('saveProject').hidden = !editor;
+  $('openExport').hidden = !editor;
+  const builderTab = $('openPopupBuilder');
+  const editorTab = $('openStudioWorkspace');
+  builderTab.removeAttribute('aria-current');
+  editorTab.removeAttribute('aria-current');
+  (editor ? editorTab : builderTab).setAttribute('aria-current', 'page');
+}
+
+function showStudioWorkspace(focusCanvas = false) {
+  setStudioView(true);
+  refresh();
+  if (focusCanvas) $('art').focus();
+}
+
+function builderCopy() {
+  const brief = $('popupBrief').value.trim();
+  const copy = readPopupCopy(brief, $('popupHeadline').value.trim(), $('popupBody').value.trim());
+  const rawUrl = $('popupButtonUrl').value.trim();
+  const url = safeUrl(rawUrl);
+  const label = $('popupButtonLabel').value.trim();
+  const buttonRequested = /มีปุ่ม|ใส่ปุ่ม|เพิ่มปุ่ม|with a button/i.test(brief);
+  const button = rawUrl || label || buttonRequested ? { text: label || 'ดูรายละเอียด', url } : null;
+  return { brief, copy, rawUrl, button };
+}
+
+function builderImage(inputId) {
+  const file = $(inputId).files[0];
+  if (!file) return Promise.resolve(null);
+  if (!builderImageCache.has(file)) builderImageCache.set(file, readImage(file));
+  return builderImageCache.get(file);
+}
+
+async function builderAssetOptions() {
+  const [reference, background, logo] = await Promise.all([
+    builderImage('popupReference'), builderImage('popupBackground'), builderImage('popupLogo')
+  ]);
+  return {
+    reference: reference ? samplePopupReference(reference.image) : null,
+    background: background?.src || '',
+    logo,
+    variation: builderVariation
+  };
+}
+
+function drawBuilderPreview(design, isExample) {
+  const canvas = $('builderPreviewCanvas');
+  const fit = Math.min(660 / design.w, 410 / design.h);
+  canvas.width = Math.max(1, Math.round(design.w * fit));
+  canvas.height = Math.max(1, Math.round(design.h * fit));
+  const context = canvas.getContext('2d');
+  context.setTransform(canvas.width / design.w, 0, 0, canvas.height / design.h, 0, 0);
+  paint(context, false, design);
+  $('builderPreviewMode').textContent = isExample ? 'แบบตัวอย่าง' : 'แบบจากบรีฟของคุณ';
+  $('builderPreviewNote').textContent = isExample ? 'ใส่ขนาดและบรีฟเพื่อดูแบบของคุณ' :
+    $('popupUseAi').checked && !design.bgImage ? 'ภาพ AI จะเริ่มสร้างหลังเปิด Studio' : 'แก้ข้อความและเลเยอร์ต่อได้ใน Studio';
+  $('builderPreviewSize').textContent = design.w + ' × ' + design.h + ' px';
+}
+
+function previewExample() {
+  drawBuilderPreview(composePopup({
+    width: 1200, height: 780, brief: 'น้ำเงิน', variation: 52,
+    copy: { headline: 'เชิญผู้ถือหุ้นเสนอวาระประชุม', detail: 'เสนอวาระล่วงหน้าสำหรับการประชุมสามัญผู้ถือหุ้น' },
+    button: { text: 'ดูรายละเอียด', url: '' }
+  }), true);
+}
+
+let builderPreviewTimer;
+function queueBuilderPreview() {
+  const revision = ++builderPreviewRevision;
+  clearTimeout(builderPreviewTimer);
+  builderPreviewTimer = setTimeout(async () => {
+    const widthField = $('popupWidth');
+    const heightField = $('popupHeight');
+    const fields = builderCopy();
+    if (!widthField.validity.valid || !heightField.validity.valid ||
+        (!fields.copy.headline && !fields.copy.detail)) {
+      previewExample();
+      return;
+    }
+    try {
+      const assets = await builderAssetOptions();
+      if (revision !== builderPreviewRevision || $('popupBuilder').hidden) return;
+      drawBuilderPreview(composePopup({
+        ...fields, ...assets, width: widthField.valueAsNumber, height: heightField.valueAsNumber
+      }), false);
+    } catch (problem) {
+      if (revision !== builderPreviewRevision) return;
+      $('builderPreviewNote').textContent = problem.message || 'ยังแสดงตัวอย่างไม่ได้';
+    }
+  }, 160);
+}
+
 function openPopupBuilder() {
-  $('popupBuilderError').textContent = '';
-  $('popupBuilder').showModal();
-  $('popupWidth').focus();
+  setStudioView(false);
+  queueBuilderPreview();
 }
 
 $('openPopupBuilder').addEventListener('click', openPopupBuilder);
+$('openStudioWorkspace').addEventListener('click', () => showStudioWorkspace(true));
+$('popupBuilderForm').addEventListener('input', queueBuilderPreview);
+$('popupBuilderForm').addEventListener('change', queueBuilderPreview);
 $('popupBuilderForm').addEventListener('submit', async event => {
   event.preventDefault();
-  const brief = $('popupBrief').value.trim();
+  const form = event.currentTarget;
+  if (!form.reportValidity()) return;
+  const fields = builderCopy();
   const width = $('popupWidth').valueAsNumber;
   const height = $('popupHeight').valueAsNumber;
   const error = $('popupBuilderError');
   const submit = $('createPopup');
   error.textContent = '';
-  const copy = readPopupCopy(brief, $('popupHeadline').value.trim(), $('popupBody').value.trim());
-  if (!brief && !copy.headline && !copy.detail) {
-    error.textContent = 'ใส่บรีฟหรือข้อความก่อนสร้าง Popup';
+  if (!fields.copy.headline && !fields.copy.detail) {
+    error.textContent = 'ใส่บรีฟหรือข้อความที่ต้องการให้แสดงก่อนสร้าง Popup';
     $('popupBrief').focus();
     return;
   }
-  if (!copy.headline && !copy.detail) {
-    error.textContent = 'ใส่หัวข้อที่ต้องการให้แสดงใน Popup';
-    return;
-  }
-  const urlField = $('popupButtonUrl').value.trim();
-  const url = safeUrl(urlField);
-  if (urlField && !url) {
+  if (fields.rawUrl && !fields.button?.url) {
     error.textContent = 'ลิงก์ปลายทางต้องขึ้นต้นด้วย https:// หรือ http://';
     return;
   }
-  const label = $('popupButtonLabel').value.trim();
-  const buttonRequested = /มีปุ่ม|ใส่ปุ่ม|เพิ่มปุ่ม|with a button/i.test(brief);
-  const button = url || label || buttonRequested ? { text: label || 'ดูรายละเอียด', url } : null;
-  const referenceFile = $('popupReference').files[0];
-  const backgroundFile = $('popupBackground').files[0];
-  const logoFile = $('popupLogo').files[0];
-  const useAi = $('popupUseAi').checked && !backgroundFile;
-  const imageBrief = $('popupAiPrompt').value.trim() || brief || [copy.headline, copy.detail].filter(Boolean).join(' ');
+  const useAi = $('popupUseAi').checked && !$('popupBackground').files[0];
+  const imageBrief = $('popupAiPrompt').value.trim() || fields.brief ||
+    [fields.copy.headline, fields.copy.detail].filter(Boolean).join(' ');
   submit.disabled = true;
   try {
-    const reference = referenceFile ? samplePopupReference((await readImage(referenceFile)).image) : null;
-    const background = backgroundFile ? (await readImage(backgroundFile)).src : '';
-    const logo = logoFile ? await readImage(logoFile) : null;
-    const design = composePopup({ width, height, copy, button, background, reference, brief, logo });
+    const assets = await builderAssetOptions();
+    const design = composePopup({ ...fields, ...assets, width, height });
     stopPopupBackground();
     remember();
     state = design;
-    selected = design.items[0]?.id ?? null;
+    selected = design.items.find(item => item.type === 'text')?.id ?? null;
     $('w').value = width;
     $('h').value = height;
-    refresh();
-    $('popupBuilder').close();
+    showStudioWorkspace(true);
     notice('สร้าง Popup แล้ว แก้ข้อความ พื้นหลัง และปุ่มได้ก่อนส่งออก');
     if (useAi) void generatePopupBackground(design, imageBrief);
   } catch (problem) {
