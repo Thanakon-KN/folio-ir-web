@@ -717,6 +717,8 @@ refresh();
 #aiShapePreview { width: 100%; max-height: 115px; margin: 8px 0; background: var(--field); border: 1px solid var(--line); border-radius: 7px; }
 #aiShapePrompt { min-height: 72px; }
 #aiShapeProgress { width: 100%; accent-color: var(--accent); }
+.ai-shape-toggle { display: flex; align-items: center; gap: 7px; cursor: pointer; }
+#aiShapeAuto { width: auto; margin: 0; accent-color: var(--accent); }
 </style>
 <script>
 function syncOpacity() {
@@ -962,8 +964,9 @@ imageCropPanel.innerHTML = `
     <summary>สร้างกรอบด้วย AI</summary>
     <label for="aiShapePrompt">อธิบายทรงที่ต้องการ</label>
     <textarea id="aiShapePrompt" maxlength="300" placeholder="เช่น กรอบทรงหยดน้ำ ปลายเอียงขวา"></textarea>
-    <p>ครั้งแรกต้องดาวน์โหลดโมเดล และใช้เบราว์เซอร์ที่รองรับ WebGPU</p>
-    <button type="button" id="generateAiShape" class="primary block-action">สร้างรูปทรง</button>
+    <label class="ai-shape-toggle"><input id="aiShapeAuto" type="checkbox" checked> สร้างและใช้กรอบอัตโนมัติ</label>
+    <p>หยุดพิมพ์สักครู่เพื่อสร้างกรอบ หรือเว้นว่างแล้วกดให้ AI คิดทรงให้ ครั้งแรกต้องดาวน์โหลดโมเดลและใช้ WebGPU</p>
+    <button type="button" id="generateAiShape" class="primary block-action">สร้างตอนนี้</button>
     <progress id="aiShapeProgress" max="1" aria-label="ความคืบหน้า" hidden></progress>
     <p id="aiShapeStatus" role="status" aria-live="polite"></p>
     <div id="aiShapeDraft" hidden>
@@ -1253,6 +1256,7 @@ const refreshEditor = refresh;
 refresh = function () {
   refreshEditor();
   const selectedItem = current();
+  syncAiShapeSelection(selectedItem);
   syncImageCropTools(selectedItem);
   const kinds = { text: 'ข้อความ', image: 'รูปภาพ', button: 'ปุ่ม' };
   $('selectionKind').textContent = selectedItem ? kinds[selectedItem.type] : '';
@@ -1317,33 +1321,92 @@ function syncAiShapeDraft(item) {
   context.stroke(path);
 }
 
-$('aiShapePrompt').addEventListener('input', () => {
-  aiShapeDraft = null;
-  syncAiShapeDraft(current());
-});
+const AUTO_SHAPE_DELAY = 1200;
+let aiShapeSelection = null;
+let aiShapeRequestId = 0;
+let aiShapeTimer = null;
+let aiShapePending = null;
+let aiShapeBusy = false;
 
-$('generateAiShape').addEventListener('click', async () => {
+function cancelAiShapeRequest() {
+  clearTimeout(aiShapeTimer);
+  aiShapePending = null;
+  aiShapeDraft = null;
+  aiShapeRequestId++;
+}
+
+function syncAiShapeSelection(item) {
+  if (item === aiShapeSelection) return;
+  aiShapeSelection = item;
+  cancelAiShapeRequest();
+  $('aiShapeStatus').textContent = '';
+  $('aiShapeDraft').hidden = true;
+}
+
+function isCurrentAiShapeRequest(request) {
+  return request.id === aiShapeRequestId && request.item === current();
+}
+
+function applyGeneratedFrame(points) {
+  activeFrameVertex = 0;
+  mutate(target => {
+    target.imageShape = 'polygon';
+    target.framePoints = points;
+  });
+}
+
+function automaticShapePrompt(item) {
+  const ratio = item.w / item.h;
+  const layout = ratio > 1.2 ? 'landscape' : ratio < .83 ? 'portrait' : 'square';
+  return 'Invent a decorative editable clipping frame for a ' + layout +
+    ' photo. Use an interesting but gentle outline with a large central area.';
+}
+
+function scheduleAiShape(immediate = false, composing = false) {
   const item = current();
   const prompt = $('aiShapePrompt').value.trim();
+  const automatic = $('aiShapeAuto').checked;
   const status = $('aiShapeStatus');
   if (item?.type !== 'image') return;
-  if (!prompt) {
-    status.textContent = 'พิมพ์คำอธิบายรูปทรงก่อน';
-    $('aiShapePrompt').focus();
-    return;
-  }
+
+  cancelAiShapeRequest();
+  syncAiShapeDraft(item);
+  status.textContent = '';
+  if (!immediate && (!automatic || !prompt || composing)) return;
   if (!navigator.gpu) {
     status.textContent = 'เบราว์เซอร์นี้ใช้ WebGPU ไม่ได้ ลองเปิดใน Chrome หรือ Edge ที่รองรับ';
     return;
   }
 
-  const generate = $('generateAiShape');
+  const request = {
+    id: aiShapeRequestId,
+    item,
+    prompt: prompt || automaticShapePrompt(item),
+    automatic,
+    originalShape: item.imageShape,
+    originalPoints: item.framePoints
+  };
+  const enqueue = () => {
+    aiShapePending = request;
+    if (aiShapeBusy) status.textContent = 'รอสร้างกรอบสำหรับคำอธิบายล่าสุด…';
+    void runAiShapeQueue();
+  };
+  if (immediate) enqueue();
+  else {
+    status.textContent = 'จะสร้างกรอบเมื่อหยุดพิมพ์…';
+    aiShapeTimer = setTimeout(enqueue, AUTO_SHAPE_DELAY);
+  }
+}
+
+async function runAiShapeQueue() {
+  if (aiShapeBusy || !aiShapePending) return;
+  const request = aiShapePending;
+  aiShapePending = null;
+  if (!isCurrentAiShapeRequest(request)) return;
+
+  aiShapeBusy = true;
+  const status = $('aiShapeStatus');
   const progress = $('aiShapeProgress');
-  const input = $('aiShapePrompt');
-  generate.disabled = true;
-  input.disabled = true;
-  aiShapeDraft = null;
-  syncAiShapeDraft(item);
   try {
     if (!aiShapeEngine) {
       status.textContent = 'กำลังเตรียมดาวน์โหลดโมเดล…';
@@ -1353,49 +1416,68 @@ $('generateAiShape').addEventListener('click', async () => {
       aiShapeEngine = await CreateMLCEngine(AI_SHAPE_MODEL, {
         initProgressCallback: report => {
           progress.value = Math.max(0, Math.min(1, report.progress));
-          status.textContent = 'กำลังเตรียมโมเดล ' + Math.round(progress.value * 100) + '%';
+          if (isCurrentAiShapeRequest(request)) {
+            status.textContent = 'กำลังเตรียมโมเดล ' + Math.round(progress.value * 100) + '%';
+          }
         }
       });
     }
+
     progress.hidden = true;
+    if (!isCurrentAiShapeRequest(request)) return;
     status.textContent = 'AI กำลังสร้างรูปทรง…';
     const result = await aiShapeEngine.chat.completions.create({
       messages: [
         { role: 'system', content: aiShapeInstruction },
-        { role: 'user', content: prompt }
+        { role: 'user', content: request.prompt }
       ],
       response_format: { type: 'json_object' },
       max_tokens: 260,
       temperature: .2
     });
+    if (!isCurrentAiShapeRequest(request)) return;
+
+    let points;
     try {
-      aiShapeDraft = { item, points: decodeAiFrame(result.choices[0]?.message.content) };
-      syncAiShapeDraft(current());
-      status.textContent = 'สร้างกรอบแล้ว กด “ใช้กรอบนี้” เพื่อแก้จุดต่อบนชิ้นงาน';
+      points = decodeAiFrame(result.choices[0]?.message.content);
     } catch {
-      status.textContent = 'AI ยังสร้างกรอบจากคำอธิบายนี้ไม่สำเร็จ ลองระบุทรงและทิศทางให้สั้นลง';
+      status.textContent = 'AI สร้างกรอบไม่สำเร็จ ลองปรับคำอธิบายแล้วสร้างอีกครั้ง';
+      return;
+    }
+    const outlineUnchanged = request.item.imageShape === request.originalShape &&
+      request.item.framePoints === request.originalPoints;
+    if (request.automatic && outlineUnchanged) {
+      applyGeneratedFrame(points);
+      status.textContent = 'ใช้กรอบอัตโนมัติแล้ว แก้จุดต่อหรือกดย้อนกลับได้';
+    } else {
+      aiShapeDraft = { item: request.item, points };
+      syncAiShapeDraft(request.item);
+      status.textContent = 'สร้างกรอบแล้ว กด “ใช้กรอบนี้” เพื่อแทนกรอบปัจจุบัน';
     }
   } catch (error) {
     console.warn('Dialog Studio AI', error);
     aiShapeEngine = null;
-    status.textContent = 'เปิดโมเดลหรือสร้างกรอบไม่สำเร็จ ลองใหม่บนเบราว์เซอร์ที่รองรับ WebGPU';
+    if (isCurrentAiShapeRequest(request)) {
+      status.textContent = 'เปิดโมเดลหรือสร้างกรอบไม่สำเร็จ ลองใหม่บนเบราว์เซอร์ที่รองรับ WebGPU';
+    }
   } finally {
-    generate.disabled = false;
-    input.disabled = false;
+    aiShapeBusy = false;
     progress.hidden = true;
+    void runAiShapeQueue();
   }
-});
+}
+
+$('aiShapePrompt').addEventListener('input', event => scheduleAiShape(false, event.isComposing));
+$('aiShapePrompt').addEventListener('compositionend', () => scheduleAiShape());
+$('aiShapeAuto').addEventListener('change', () => scheduleAiShape());
+$('generateAiShape').addEventListener('click', () => scheduleAiShape(true));
 
 $('applyAiShape').addEventListener('click', () => {
   const item = current();
   if (!aiShapeDraft || aiShapeDraft.item !== item) return;
   const points = aiShapeDraft.points;
   aiShapeDraft = null;
-  activeFrameVertex = 0;
-  mutate(target => {
-    target.imageShape = 'polygon';
-    target.framePoints = points;
-  });
+  applyGeneratedFrame(points);
   $('aiShapeStatus').textContent = 'ใช้กรอบแล้ว แก้รูปทรงต่อได้ในส่วนกำหนดเอง';
 });
 
