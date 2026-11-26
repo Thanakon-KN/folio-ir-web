@@ -614,7 +614,49 @@ function itemContainsPoint(item, { x, y }) {
   const shape = imageShape(item);
   return ctx.isPointInPath(imageClipPath(shape, imageShapeBounds(item, shape), item), x, y);
 }
-function linesFor(context,text,width){const lines=[];for(const paragraph of text.split('\n')){let line='';for(const char of Array.from(paragraph)){if(line&&context.measureText(line+char).width>width){lines.push(line);line=char}else line+=char}lines.push(line)}return lines}
+const wordBreaker = typeof Intl.Segmenter === 'function' ? new Intl.Segmenter('th', { granularity: 'word' }) : null;
+const graphemeBreaker = wordBreaker && new Intl.Segmenter('th', { granularity: 'grapheme' });
+
+function linesFor(context, text, width) {
+  const lines = [];
+  const fits = value => context.measureText(value).width <= width;
+  for (const paragraph of text.split(/\r\n?|\n/)) {
+    let line = '';
+    let spaces = '';
+    const words = wordBreaker
+      ? Array.from(wordBreaker.segment(paragraph), part => part.segment)
+      : paragraph.match(/\s+|\S+/gu) || [];
+    for (const word of words) {
+      if (/^\s+$/u.test(word)) {
+        spaces += word;
+        continue;
+      }
+      const candidate = line + spaces + word;
+      spaces = '';
+      if (fits(candidate)) {
+        line = candidate;
+        continue;
+      }
+      if (line) lines.push(line);
+      line = word;
+      if (fits(word)) continue;
+      // A single word wider than the box still needs to fit without splitting a combining mark.
+      const clusters = graphemeBreaker
+        ? Array.from(graphemeBreaker.segment(word), part => part.segment)
+        : word.match(/\P{M}\p{M}*|\p{M}+/gu) || [];
+      line = '';
+      for (const cluster of clusters) {
+        if (line && !fits(line + cluster)) {
+          lines.push(line);
+          line = '';
+        }
+        line += cluster;
+      }
+    }
+    lines.push(line);
+  }
+  return lines;
+}
 // New motifs share a scale based on the short side, so they work on tall and wide popups.
 const tilePatterns = {
   hex(context, size) {
